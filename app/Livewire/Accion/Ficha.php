@@ -4,6 +4,8 @@ namespace App\Livewire\Accion;
 
 use App\Http\Controllers\FichaController;
 use App\Models\FichaDescriptiva;
+use App\Models\FichaEstado;
+use App\Models\FichaHistorial;
 use App\Models\Generacion;
 use App\Models\Grado;
 use App\Models\Grupo;
@@ -20,6 +22,9 @@ use App\Services\TeacherAcademicScopeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Attributes\Locked;
@@ -27,6 +32,7 @@ use Livewire\WithPagination;
 
 use App\Exports\FichaDescriptivaPlantillaImportacionExport;
 use App\Imports\FichaDescriptivaImport;
+use App\Imports\FichaDescriptivaPreviewReader;
 use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
 use Throwable;
@@ -47,6 +53,14 @@ class Ficha extends Component
     }
 
     public string $descripcion = '';
+    public string $revisionActual = '';
+    public string $propuesta_ia = '';
+    public string $texto_original_ia = '';
+    public string $estadoGuardado = 'guardado';
+    public string $vistaAlumnos = 'tabla';
+    public string $estadoFiltro = 'todos';
+    public ?array $previsualizacionImportacion = null;
+
 
     public bool $generando_descripcion = false;
 
@@ -99,6 +113,8 @@ class Ficha extends Component
         'grupo_id' => ['except' => null],
         'periodo' => ['except' => 1],
         'busqueda' => ['except' => ''],
+        'vistaAlumnos' => ['except' => 'tabla'],
+        'estadoFiltro' => ['except' => 'todos'],
     ];
 
     public function descargarPlantillaImportacion()
@@ -128,42 +144,88 @@ class Ficha extends Component
         );
     }
 
-    public function importarPlantillaFichas(): void
+    public function previsualizarImportacion(): void
     {
+        $this->asegurarTablasControl();
         $this->assertAdministrativeToolAccess();
         $this->assertTeacherContext();
-        $this->validate([
-            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
-            'grado_id' => ['required', 'integer', 'exists:grados,id'],
-            'periodo' => ['required', 'integer', 'in:1,2,3'],
-            'archivo_fichas' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
-        ], [
-            'grado_id.required' => 'Selecciona el grado correspondiente a la plantilla.',
-            'archivo_fichas.required' => 'Selecciona el archivo Excel de fichas.',
-            'archivo_fichas.mimes' => 'El archivo debe ser Excel .xlsx o .xls.',
-        ]);
+        $this->validarImportacion();
 
-        Excel::import(
-            new FichaDescriptivaImport(
-                nivelId: $this->nivel_id,
-                gradoId: $this->grado_id,
-                grupoId: $this->grupo_id,
-                generacionId: $this->generacion_id,
-                cicloEscolarId: $this->ciclo_escolar_id,
-                periodo: $this->periodo
-            ),
-            $this->archivo_fichas
-        );
+        $importador = $this->nuevoImportador();
+        $filas = collect(Excel::toArray(new FichaDescriptivaPreviewReader(), $this->archivo_fichas)[0] ?? [])
+            ->map(fn ($fila) => collect($fila));
+        $this->previsualizacionImportacion = $importador->analizarFilas($filas);
+        $this->previsualizacionImportacion['huella'] = hash_file('sha256', $this->archivo_fichas->getRealPath());
+    }
 
+    public function importarPlantillaFichas(): void
+    {
+        $this->asegurarTablasControl();
+        $this->assertAdministrativeToolAccess();
+        $this->assertTeacherContext();
+        $this->validarImportacion();
+
+        if (!$this->previsualizacionImportacion
+            || $this->previsualizacionImportacion['huella'] !== hash_file('sha256', $this->archivo_fichas->getRealPath())
+            || ($this->previsualizacionImportacion['errores'] ?? []) !== []) {
+            $this->addError('archivo_fichas', 'Primero realiza una previsualización sin errores del archivo seleccionado.');
+            return;
+        }
+
+        Excel::import($this->nuevoImportador(), $this->archivo_fichas);
         $this->archivo_fichas = null;
+        $this->previsualizacionImportacion = null;
         $this->resetPage();
         $this->limpiarInformeGrupoIa();
-
         $this->dispatch('swal', [
             'icon' => 'success',
             'title' => 'Fichas importadas correctamente',
             'position' => 'top',
         ]);
+    }
+
+    public function descargarErroresImportacion()
+    {
+        $this->assertAdministrativeToolAccess();
+        $errores = $this->previsualizacionImportacion['errores'] ?? [];
+        abort_if($errores === [], 422, 'No hay errores de importación para descargar.');
+        return response()->streamDownload(function () use ($errores) {
+            $salida = fopen('php://output', 'w');
+            fwrite($salida, "\xEF\xBB\xBF");
+            fputcsv($salida, ['Detalle del error']);
+            foreach ($errores as $error) {
+                fputcsv($salida, [$error]);
+            }
+            fclose($salida);
+        }, 'errores-importacion-fichas.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    private function validarImportacion(): void
+    {
+        $this->validate([
+            'ciclo_escolar_id' => ['required', 'integer', 'exists:ciclo_escolares,id'],
+            'grado_id' => ['required', 'integer', 'exists:grados,id'],
+            'periodo' => ['required', 'integer', 'in:1,2,3'],
+            'archivo_fichas' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
+        ]);
+        app(CicloNivelGateService::class)->asegurar((int) $this->ciclo_escolar_id, (int) $this->nivel_id, 'fichas');
+    }
+
+    private function nuevoImportador(): FichaDescriptivaImport
+    {
+        return new FichaDescriptivaImport(
+            nivelId: (int) $this->nivel_id,
+            gradoId: (int) $this->grado_id,
+            grupoId: $this->grupo_id,
+            generacionId: $this->generacion_id,
+            cicloEscolarId: (int) $this->ciclo_escolar_id,
+            periodo: $this->periodo
+        );
+    }
+
+    public function updatedArchivoFichas(): void
+    {
+        $this->previsualizacionImportacion = null;
     }
 
     public function mount(string $slug_nivel = 'preescolar', ?string $slug_grado = null): void
@@ -191,7 +253,7 @@ class Ficha extends Component
 
     public function updated($property): void
     {
-        if (in_array($property, ['generacion_id', 'grado_id', 'grupo_id', 'periodo', 'busqueda'], true)) {
+        if (in_array($property, ['generacion_id', 'grado_id', 'grupo_id', 'periodo', 'busqueda', 'estadoFiltro'], true)) {
             $this->resetPage();
         }
 
@@ -205,6 +267,7 @@ class Ficha extends Component
             ], true)
         ) {
             $this->limpiarInformeGrupoIa();
+            $this->previsualizacionImportacion = null;
         }
     }
 
@@ -249,29 +312,51 @@ class Ficha extends Component
         $this->limpiarInformeGrupoIa();
     }
 
-    public function abrirModal(int $inscripcionId, string $campo): void
+    /** Abre el editor integral conservando la compatibilidad con los botones anteriores. */
+    public function abrirModal(int $inscripcionId, string $campo = 'lenguajes'): void
     {
         if (!array_key_exists($campo, $this->campos)) {
             return;
         }
-
         $this->authorizedStudentOrFail($inscripcionId);
-
         $this->inscripcion_id = $inscripcionId;
         $this->campo = $campo;
         $this->observaciones_ia = '';
-
-        $this->descripcion = (string) FichaDescriptiva::query()
-            ->where('inscripcion_id', $inscripcionId)
-            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
-            ->where('periodo', $this->periodo)
-            ->where('campo', $campo)
-            ->value('descripcion');
-
+        $this->propuesta_ia = '';
+        $this->texto_original_ia = '';
+        $this->cargarCampoActual();
         $this->resetValidation();
         $this->modalAbierto = true;
-
         $this->dispatch('abrir-modal-ficha', contenido: $this->descripcion);
+    }
+
+    private function cargarCampoActual(): void
+    {
+        $ficha = FichaDescriptiva::query()
+            ->where('inscripcion_id', $this->inscripcion_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)
+            ->where('campo', $this->campo)
+            ->first();
+        $this->descripcion = (string) ($ficha?->descripcion ?? '');
+        $this->revisionActual = hash('sha256', $this->descripcion);
+        $this->estadoGuardado = 'guardado';
+    }
+
+    /** Llamado DESPUÉS de sincronizar y guardar el campo anterior en el cliente. */
+    public function seleccionarCampo(string $campo): void
+    {
+        if (!$this->modalAbierto || !array_key_exists($campo, $this->campos)) {
+            return;
+        }
+        $this->authorizedStudentOrFail((int) $this->inscripcion_id);
+        $this->campo = $campo;
+        $this->observaciones_ia = '';
+        $this->propuesta_ia = '';
+        $this->texto_original_ia = '';
+        $this->cargarCampoActual();
+        $this->resetValidation();
+        $this->dispatch('actualizar-editor-ficha', contenido: $this->descripcion);
     }
 
     public function cerrarModal(): void
@@ -280,11 +365,11 @@ class Ficha extends Component
         $this->inscripcion_id = null;
         $this->campo = '';
         $this->descripcion = '';
+        $this->revisionActual = '';
+        $this->propuesta_ia = '';
         $this->observaciones_ia = '';
         $this->generando_descripcion = false;
-
         $this->resetValidation();
-
         $this->dispatch('cerrar-modal-ficha');
     }
 
@@ -353,20 +438,16 @@ class Ficha extends Component
                 ]
             );
 
-            $this->descripcion = $this->convertirTextoAHtml($resultado);
+            $this->texto_original_ia = $this->descripcion;
+            $this->propuesta_ia = $this->convertirTextoAHtml($resultado);
             $this->observaciones_ia = '';
 
             $this->verificarGroq($groq);
 
-            $this->dispatch(
-                'actualizar-editor-ficha',
-                contenido: $this->descripcion
-            );
-
             $this->dispatch('swal', [
                 'icon' => 'success',
-                'title' => 'Descripción generada con GroqCloud',
-                'text' => 'Revisa el texto y realiza los ajustes necesarios antes de guardarlo.',
+                'title' => 'Propuesta pedagógica lista para revisar',
+                'text' => 'Compara el texto original con la sugerencia y acéptala si corresponde.',
                 'position' => 'top',
             ]);
         } catch (Throwable $exception) {
@@ -388,36 +469,76 @@ class Ficha extends Component
         }
     }
 
-    public function guardar(CicloNivelGateService $gate): void
+    public function aceptarSugerenciaIA(): void
     {
+        $this->assertAdministrativeToolAccess();
+        if (!$this->modalAbierto || $this->propuesta_ia === '') {
+            return;
+        }
+        $this->descripcion = $this->propuesta_ia;
+        $this->estadoGuardado = 'pendiente';
+        $this->propuesta_ia = '';
+        $this->dispatch('actualizar-editor-ficha', contenido: $this->descripcion);
+    }
+
+    public function descartarSugerenciaIA(): void
+    {
+        $this->propuesta_ia = '';
+        $this->texto_original_ia = '';
+    }
+
+    /** Guardado explícito o automático, con detección de versiones obsoletas. */
+    public function guardarBorrador(CicloNivelGateService $gate): void
+    {
+        $this->asegurarTablasControl();
         $this->validate([
             'inscripcion_id' => ['required', 'integer', 'exists:inscripciones,id'],
             'campo' => ['required', 'string', 'in:' . implode(',', array_keys($this->campos))],
             'descripcion' => ['nullable', 'string', 'max:5000'],
-        ], [
-            'descripcion.max' => 'La descripción no puede superar los 5000 caracteres.',
         ]);
-
         $alumno = $this->authorizedStudentOrFail((int) $this->inscripcion_id);
         $gate->asegurar((int) $this->ciclo_escolar_id, (int) $alumno->nivel_id, 'fichas');
         $periodoOficialId = $this->resolverPeriodoOficialId((int) $alumno->nivel_id);
-
         if (!$periodoOficialId) {
-            $this->addError('periodo', 'No existe un periodo oficial compatible con el ciclo, nivel y número de periodo seleccionados.');
+            $this->addError('periodo', 'No existe un periodo oficial compatible con el ciclo y la evaluación seleccionados.');
             return;
         }
 
         $descripcionLimpia = app(HtmlSanitizerService::class)->sanitize($this->descripcion);
-
-        FichaDescriptiva::query()->updateOrCreate(
-            [
+        $this->estadoGuardado = 'guardando';
+        DB::transaction(function () use ($alumno, $periodoOficialId, $descripcionLimpia) {
+            $estado = FichaEstado::query()->firstOrCreate([
                 'inscripcion_id' => $alumno->id,
                 'ciclo_escolar_id' => $this->ciclo_escolar_id,
                 'periodo' => $this->periodo,
-                'periodo_id' => $periodoOficialId,
+            ], ['estado' => 'borrador']);
+            $estado = FichaEstado::query()->whereKey($estado->id)->lockForUpdate()->firstOrFail();
+            if ($estado->estado === 'finalizada') {
+                throw ValidationException::withMessages([
+                    'descripcion' => 'Esta ficha está finalizada. Solicita la reapertura antes de editar.',
+                ]);
+            }
+
+            $claves = [
+                'inscripcion_id' => $alumno->id,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'periodo' => $this->periodo,
                 'campo' => $this->campo,
-            ],
-            [
+            ];
+            $actual = FichaDescriptiva::query()->where($claves)->lockForUpdate()->first();
+            $original = (string) ($actual?->descripcion ?? '');
+            if (hash('sha256', $original) !== $this->revisionActual) {
+                $this->estadoGuardado = 'conflicto';
+                throw ValidationException::withMessages([
+                    'descripcion' => 'Otro usuario actualizó este apartado. Copia tus cambios y vuelve a abrir la ficha para revisar la versión más reciente.',
+                ]);
+            }
+            if ($original === $descripcionLimpia) {
+                $this->revisionActual = hash('sha256', $original);
+                return;
+            }
+            FichaDescriptiva::query()->updateOrCreate($claves, [
+                'periodo_id' => $periodoOficialId,
                 'nivel_id' => $alumno->nivel_id,
                 'grado_id' => $alumno->grado_id,
                 'grupo_id' => $alumno->grupo_id,
@@ -425,17 +546,168 @@ class Ficha extends Component
                 'descripcion' => $descripcionLimpia,
                 'capturado_por' => Auth::id(),
                 'fecha_captura' => now(),
-            ]
-        );
-
+            ]);
+            FichaHistorial::query()->create([
+                'inscripcion_id' => $alumno->id,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'periodo' => $this->periodo,
+                'campo' => $this->campo,
+                'accion' => 'edicion',
+                'valor_anterior' => $original,
+                'valor_nuevo' => $descripcionLimpia,
+                'user_id' => Auth::id(),
+            ]);
+            if ($estado->estado === 'en_revision') {
+                $estado->update(['estado' => 'borrador', 'revisado_por' => null, 'revisado_at' => null]);
+            }
+            $this->revisionActual = hash('sha256', $descripcionLimpia);
+        });
+        $this->descripcion = $descripcionLimpia;
+        $this->estadoGuardado = 'guardado';
         $this->limpiarInformeGrupoIa();
-        $this->cerrarModal();
+    }
 
-        $this->dispatch('swal', [
-            'icon' => 'success',
-            'title' => 'Ficha guardada',
-            'position' => 'top',
-        ]);
+    public function guardar(CicloNivelGateService $gate): void
+    {
+        $this->guardarBorrador($gate);
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+        $this->cerrarModal();
+        $this->dispatch('swal', ['icon' => 'success', 'title' => 'Ficha guardada', 'position' => 'top']);
+    }
+
+    public function enviarRevision(int $inscripcionId): void
+    {
+        $alumno = $this->authorizedStudentOrFail($inscripcionId);
+        app(CicloNivelGateService::class)->asegurar((int) $this->ciclo_escolar_id, (int) $alumno->nivel_id, 'fichas');
+        $this->actualizarEstadoFicha($alumno, 'en_revision');
+    }
+
+    public function finalizarFicha(int $inscripcionId): void
+    {
+        $this->assertAdministrativeToolAccess();
+        $alumno = $this->authorizedStudentOrFail($inscripcionId);
+        app(CicloNivelGateService::class)->asegurar((int) $this->ciclo_escolar_id, (int) $alumno->nivel_id, 'fichas');
+        $this->actualizarEstadoFicha($alumno, 'finalizada');
+    }
+
+    public function reabrirFicha(int $inscripcionId): void
+    {
+        $this->assertAdministrativeToolAccess();
+        $alumno = $this->authorizedStudentOrFail($inscripcionId);
+        app(CicloNivelGateService::class)->asegurar((int) $this->ciclo_escolar_id, (int) $alumno->nivel_id, 'fichas');
+        $this->actualizarEstadoFicha($alumno, 'borrador');
+    }
+
+    private function actualizarEstadoFicha(Inscripcion $alumno, string $nuevo): void
+    {
+        $this->asegurarTablasControl();
+        DB::transaction(function () use ($alumno, $nuevo) {
+            $claves = [
+                'inscripcion_id' => $alumno->id,
+                'ciclo_escolar_id' => $this->ciclo_escolar_id,
+                'periodo' => $this->periodo,
+            ];
+            $estado = FichaEstado::query()->firstOrCreate($claves, ['estado' => 'borrador']);
+            $estado = FichaEstado::query()->whereKey($estado->id)->lockForUpdate()->firstOrFail();
+            $anterior = $estado->estado;
+            if ($anterior === $nuevo) {
+                return;
+            }
+            if ($nuevo !== 'borrador') {
+                if ($anterior === 'finalizada') {
+                    throw ValidationException::withMessages(['descripcion' => 'La ficha finalizada debe reabrirse para modificar su estado.']);
+                }
+                $descripciones = FichaDescriptiva::query()->where($claves)->get(['campo', 'descripcion'])->keyBy('campo');
+                foreach (array_keys($this->campos) as $campo) {
+                    if (blank(trim(strip_tags((string) ($descripciones->get($campo)?->descripcion ?? ''))))) {
+                        throw ValidationException::withMessages(['descripcion' => 'Completa los cinco apartados antes de enviar a revisión o finalizar.']);
+                    }
+                }
+            }
+            $estado->update([
+                'estado' => $nuevo,
+                'revisado_por' => $nuevo === 'finalizada' ? Auth::id() : null,
+                'revisado_at' => $nuevo === 'finalizada' ? now() : null,
+            ]);
+            FichaHistorial::create($claves + [
+                'campo' => null,
+                'accion' => $nuevo === 'borrador' ? 'reapertura' : $nuevo,
+                'valor_anterior' => $anterior,
+                'valor_nuevo' => $nuevo,
+                'user_id' => Auth::id(),
+            ]);
+        });
+        $this->dispatch('swal', ['icon' => 'success', 'title' => 'Estado de ficha actualizado', 'position' => 'top']);
+    }
+
+    /** Una instalación sin la migración PRO todavía puede consultar sus fichas anteriores. */
+    public function getTablasControlListasProperty(): bool
+    {
+        return Schema::hasTable('ficha_estados') && Schema::hasTable('ficha_historiales');
+    }
+
+    private function asegurarTablasControl(): void
+    {
+        if (!$this->tablasControlListas) {
+            throw ValidationException::withMessages([
+                'descripcion' => 'Faltan las tablas de control de Fichas PRO. Ejecuta php artisan migrate y después php artisan optimize:clear.',
+            ]);
+        }
+    }
+
+    public function getEstadosPaginaProperty(): array
+    {
+        if (!$this->tablasControlListas) {
+            return [];
+        }
+        return FichaEstado::query()
+            ->whereIn('inscripcion_id', $this->alumnosPagina->pluck('id'))
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)
+            ->pluck('estado', 'inscripcion_id')->toArray();
+    }
+
+    public function getEstadisticasFichasProperty(): array
+    {
+        $ids = $this->queryAlumnos()->pluck('id');
+        $total = $ids->count();
+        if ($total === 0) {
+            return ['total' => 0, 'completas' => 0, 'en_proceso' => 0, 'pendientes' => 0, 'finalizadas' => 0];
+        }
+        $camposPorAlumno = FichaDescriptiva::query()
+            ->whereIn('inscripcion_id', $ids)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)
+            ->get(['inscripcion_id', 'campo', 'descripcion'])
+            ->filter(fn ($item) => array_key_exists($item->campo, $this->campos)
+                && filled(trim(strip_tags((string) $item->descripcion))))
+            ->groupBy('inscripcion_id');
+        $completas = $camposPorAlumno->filter(fn ($items) => $items->pluck('campo')->unique()->count() === count($this->campos))->count();
+        $enProceso = $camposPorAlumno->count() - $completas;
+        $finalizadas = !$this->tablasControlListas ? 0 : FichaEstado::query()->whereIn('inscripcion_id', $ids)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)->where('estado', 'finalizada')->count();
+        return [
+            'total' => $total,
+            'completas' => $completas,
+            'en_proceso' => $enProceso,
+            'pendientes' => max(0, $total - $completas - $enProceso),
+            'finalizadas' => $finalizadas,
+        ];
+    }
+
+    public function getHistorialModalProperty()
+    {
+        if (!$this->tablasControlListas || !$this->inscripcion_id || !$this->modalAbierto) {
+            return collect();
+        }
+        return FichaHistorial::query()
+            ->where('inscripcion_id', $this->inscripcion_id)
+            ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+            ->where('periodo', $this->periodo)
+            ->latest('id')->limit(8)->get();
     }
 
     public function generarInformeGrupoIa(GroqFichaGrupoService $groq): void
@@ -926,15 +1198,41 @@ class Ficha extends Component
             ->when($this->generacion_id, fn($q) => $q->where('generacion_id', $this->generacion_id))
             ->when($this->grado_id, fn($q) => $q->where('grado_id', $this->grado_id))
             ->when($this->grupo_id, fn($q) => $q->where('grupo_id', $this->grupo_id))
-            ->when($this->busqueda !== '', function ($q) {
-                $texto = '%' . Str::of($this->busqueda)->squish() . '%';
-                $q->where(function ($sub) use ($texto) {
-                    $sub->where('nombre', 'like', $texto)
-                        ->orWhere('apellido_paterno', 'like', $texto)
-                        ->orWhere('apellido_materno', 'like', $texto)
-                        ->orWhere('curp', 'like', $texto)
-                        ->orWhere('matricula', 'like', $texto);
-                });
+            ->when(trim($this->busqueda) !== '', function ($q) {
+                $tokens = preg_split('/\s+/u', trim((string) Str::of($this->busqueda)->squish())) ?: [];
+                foreach (array_slice($tokens, 0, 8) as $token) {
+                    $texto = '%' . addcslashes($token, '%_\\') . '%';
+                    $q->where(function ($sub) use ($texto) {
+                        $sub->where('nombre', 'like', $texto)
+                            ->orWhere('apellido_paterno', 'like', $texto)
+                            ->orWhere('apellido_materno', 'like', $texto)
+                            ->orWhere('curp', 'like', $texto)
+                            ->orWhere('matricula', 'like', $texto);
+                    });
+                }
+            })
+            ->when($this->estadoFiltro !== 'todos', function ($query) {
+                $capturadas = FichaDescriptiva::query()
+                    ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                    ->where('periodo', $this->periodo)
+                    ->whereIn('campo', array_keys($this->campos))
+                    ->whereNotNull('descripcion')->where('descripcion', '!=', '');
+                $completas = (clone $capturadas)->select('inscripcion_id')->groupBy('inscripcion_id')
+                    ->havingRaw('COUNT(DISTINCT campo) >= ?', [count($this->campos)]);
+                if ($this->estadoFiltro === 'sin_captura') {
+                    $query->whereNotIn('id', $capturadas->select('inscripcion_id')->distinct());
+                } elseif ($this->estadoFiltro === 'en_proceso') {
+                    $query->whereIn('id', $capturadas->select('inscripcion_id')->distinct())
+                        ->whereNotIn('id', $completas);
+                } elseif ($this->estadoFiltro === 'completas') {
+                    $query->whereIn('id', $completas);
+                } elseif (in_array($this->estadoFiltro, ['en_revision', 'finalizada'], true)) {
+                    $query->whereIn('id', FichaEstado::query()
+                        ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                        ->where('periodo', $this->periodo)
+                        ->where('estado', $this->estadoFiltro)
+                        ->select('inscripcion_id'));
+                }
             })
             ->orderBy('apellido_paterno')
             ->orderBy('apellido_materno')
@@ -949,6 +1247,18 @@ class Ficha extends Component
     public function getUrlPdfGrupoProperty(): string
     {
         return route('misrutas.fichas.grupo.pdf', $this->parametrosDescarga());
+    }
+
+    public function getUrlWordGrupoProperty(): string
+    {
+        return route('misrutas.fichas.grupo.word', $this->parametrosDescarga());
+    }
+
+    public function urlWordAlumno(int $inscripcionId): string
+    {
+        return route('misrutas.fichas.alumno.word', array_merge($this->parametrosDescarga(), [
+            'inscripcion' => $inscripcionId,
+        ]));
     }
 
     public function urlPdfAlumno(int $inscripcionId): string
@@ -1093,6 +1403,9 @@ class Ficha extends Component
         return view('livewire.accion.ficha', [
             'alumnos' => $this->alumnosPagina,
             'fichasResumen' => $this->fichasResumen,
+            'estadosPagina' => $this->estadosPagina,
+            'estadisticasFichas' => $this->estadisticasFichas,
+            'tablasControlListas' => $this->tablasControlListas,
         ]);
     }
 }

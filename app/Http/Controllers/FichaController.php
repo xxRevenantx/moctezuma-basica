@@ -47,8 +47,12 @@ class FichaController extends Controller
 
     public function alumnoPdf(Request $request, Inscripcion $inscripcion)
     {
+        $this->autorizarConsulta($request);
+        $nivel = Nivel::query()->where('slug', 'preescolar')->firstOrFail();
+        abort_unless((int) $inscripcion->nivel_id === (int) $nivel->id, 404);
         $periodo = (int) $request->integer('periodo', 1);
         $cicloEscolarId = $request->integer('ciclo_escolar_id') ?: $this->cicloActual()?->id;
+        abort_unless((int) $inscripcion->ciclo_escolar_id === (int) $cicloEscolarId, 404);
 
         if ($request->user()?->isProfessor()) {
             abort_unless(
@@ -99,6 +103,7 @@ class FichaController extends Controller
 
     public function grupoPdf(Request $request)
     {
+        $this->autorizarConsulta($request);
         $nivel = Nivel::query()->where('slug', 'preescolar')->firstOrFail();
 
         $periodo = (int) $request->integer('periodo', 1);
@@ -165,6 +170,8 @@ class FichaController extends Controller
 
     public function excel(Request $request)
     {
+        $this->autorizarConsulta($request);
+        abort_if($request->user()?->isProfessor(), 403, 'La exportación Excel es una herramienta administrativa.');
         $nivel = Nivel::query()->where('slug', 'preescolar')->firstOrFail();
 
         $periodo = (int) $request->integer('periodo', 1);
@@ -187,6 +194,19 @@ class FichaController extends Controller
             ),
             'fichas-descriptivas-preescolar.xlsx'
         );
+    }
+
+    private function autorizarConsulta(Request $request): void
+    {
+        abort_unless($request->user()?->canAccess('fichas.capturar'), 403);
+        $request->validate([
+            'periodo' => ['nullable', 'integer', 'between:1,3'],
+            'ciclo_escolar_id' => ['nullable', 'integer', 'exists:ciclo_escolares,id'],
+            'generacion_id' => ['nullable', 'integer'],
+            'grado_id' => ['nullable', 'integer'],
+            'grupo_id' => ['nullable', 'integer'],
+            'fecha_lugar' => ['nullable', 'string', 'max:300'],
+        ]);
     }
 
     private function teacherGroupIds(Request $request, ?int $cicloEscolarId): \Illuminate\Support\Collection

@@ -1,192 +1,154 @@
-@php($esProfesor = auth()->user()?->isProfessor())
-
-<div class="space-y-6" x-data="{ copiadoInformeGrupo: false }">
-    <div
-        class="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <div
-            class="border-b border-neutral-100 bg-gradient-to-r from-pink-50 via-white to-rose-50 p-5 dark:border-neutral-800 dark:from-pink-500/10 dark:via-neutral-900 dark:to-rose-500/10">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+@php
+    $esProfesor = auth()->user()?->isProfessor();
+@endphp
+<div class="space-y-5" x-data="{ vistaPrevia: false, urlPrevia: '', copiadoInformeGrupo: false }" @keydown.escape.window="vistaPrevia=false">
+    {{-- Encabezado institucional y selector independiente de evaluación --}}
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="relative overflow-hidden bg-gradient-to-r from-[#006492] via-[#087eaf] to-[#88ac2e] p-6 text-white sm:p-8">
+            <div class="absolute -right-16 -top-16 h-56 w-56 rounded-full border-[32px] border-white/10"></div>
+            <div class="relative flex flex-wrap items-center justify-between gap-4">
                 <div>
-                    <p class="text-xs font-black uppercase tracking-[0.18em] text-pink-600 dark:text-pink-300">
-                        Preescolar
-                    </p>
-
-                    <h2 class="mt-1 text-xl font-black text-neutral-900 dark:text-white">
-                        Ficha descriptiva individual
-                    </h2>
-
-                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                        Captura por campos formativos y recomendaciones. Este módulo reemplaza calificaciones para
-                        preescolar.
-                    </p>
+                    <div class="mb-2 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest">
+                        <flux:icon.academic-cap class="size-4" /> Preescolar · Gestión académica
+                    </div>
+                    <h1 class="text-2xl font-black tracking-tight sm:text-3xl">Fichas Descriptivas <span class="text-lime-200">PRO 2.0</span></h1>
+                    <p class="mt-2 max-w-2xl text-sm text-white/90">Captura pedagógica, revisión académica y documentos institucionales por estudiante y periodo.</p>
                 </div>
-
-                <div class="flex flex-wrap gap-2">
-                    @foreach ([1, 2, 3] as $p)
-                        <flux:button type="button" wire:click="cambiarPeriodo({{ $p }})"
-                            :variant="$periodo === $p ? 'primary' : 'outline'" size="sm">
-                            {{ $this->periodoCorto($p) }}
-                        </flux:button>
+                <div class="rounded-2xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
+                    <div class="text-xs font-semibold text-white/80">Evaluación seleccionada</div>
+                    <div class="mt-1 text-lg font-black">{{ $this->periodoCorto($periodo) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-4 dark:border-neutral-800">
+            @foreach ([1, 2, 3] as $p)
+                <flux:button type="button" wire:click="cambiarPeriodo({{ $p }})" :variant="$periodo === $p ? 'primary' : 'outline'" size="sm">
+                    {{ $this->periodoCorto($p) }}
+                </flux:button>
+            @endforeach
+        </div>
+        <div class="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-7">
+            <flux:field><flux:label>Ciclo escolar</flux:label>
+                <flux:select wire:model.live="ciclo_escolar_id">
+                    @foreach ($this->ciclosEscolares as $ciclo)
+                        <flux:select.option value="{{ $ciclo->id }}">{{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}</flux:select.option>
                     @endforeach
-                </div>
-            </div>
+                </flux:select><flux:error name="ciclo_escolar_id" />
+            </flux:field>
+            <flux:field><flux:label>Generación</flux:label>
+                <flux:select wire:model.live="generacion_id"><flux:select.option value="">Todas</flux:select.option>
+                    @foreach ($this->generaciones as $generacion)
+                        <flux:select.option value="{{ $generacion->id }}">{{ $generacion->anio_ingreso }}-{{ $generacion->anio_egreso }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+            <flux:field><flux:label>Grado</flux:label>
+                <flux:select wire:model.live="grado_id"><flux:select.option value="">Todos</flux:select.option>
+                    @foreach ($this->grados as $grado)
+                        <flux:select.option value="{{ $grado->id }}">{{ $grado->nombre }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+            <flux:field><flux:label>Grupo</flux:label>
+                <flux:select wire:model.live="grupo_id"><flux:select.option value="">Todos</flux:select.option>
+                    @foreach ($this->grupos as $grupo)
+                        <flux:select.option value="{{ $grupo->id }}">{{ $grupo->asignacionGrupo?->nombre ?? ($grupo->nombre ?? 'Grupo ' . $grupo->id) }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+            <flux:field><flux:label>Buscar alumno</flux:label>
+                <flux:input type="search" wire:model.live.debounce.350ms="busqueda" icon="magnifying-glass" placeholder="Nombre, apellidos, matrícula o CURP" />
+            </flux:field>
+            <flux:field><flux:label>Estado de la ficha</flux:label>
+                <flux:select wire:model.live="estadoFiltro">
+                    <flux:select.option value="todos">Todos</flux:select.option>
+                    <flux:select.option value="sin_captura">Sin captura</flux:select.option>
+                    <flux:select.option value="en_proceso">En proceso</flux:select.option>
+                    <flux:select.option value="completas">Con 5 apartados</flux:select.option>
+                    <flux:select.option value="en_revision">En revisión</flux:select.option>
+                    <flux:select.option value="finalizada">Finalizadas</flux:select.option>
+                </flux:select>
+            </flux:field>
+            <flux:field><flux:label>Fecha y lugar (documentos)</flux:label>
+                <flux:input wire:model.live.debounce.500ms="fecha_lugar" placeholder="Lugar y fecha" />
+            </flux:field>
         </div>
+    </section>
 
-        <div class="space-y-4 p-5">
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <flux:field>
-                    <flux:label>Ciclo escolar</flux:label>
-                    <flux:select wire:model.live="ciclo_escolar_id">
-                        @foreach ($this->ciclosEscolares as $ciclo)
-                            <flux:select.option value="{{ $ciclo->id }}">
-                                {{ $ciclo->inicio_anio }}-{{ $ciclo->fin_anio }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                    <flux:error name="ciclo_escolar_id" />
-                </flux:field>
-
-                <flux:field>
-                    <flux:label>Generación</flux:label>
-                    <flux:select wire:model.live="generacion_id">
-                        <flux:select.option value="">Todas</flux:select.option>
-
-                        @foreach ($this->generaciones as $generacion)
-                            <flux:select.option value="{{ $generacion->id }}">
-                                {{ $generacion->anio_ingreso }}-{{ $generacion->anio_egreso }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                    <flux:error name="generacion_id" />
-                </flux:field>
-
-                <flux:field>
-                    <flux:label>Grado</flux:label>
-                    <flux:select wire:model.live="grado_id">
-                        <flux:select.option value="">Todos</flux:select.option>
-
-                        @foreach ($this->grados as $grado)
-                            <flux:select.option value="{{ $grado->id }}">
-                                {{ $grado->nombre }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                    <flux:error name="grado_id" />
-                </flux:field>
-
-                <flux:field>
-                    <flux:label>Grupo</flux:label>
-                    <flux:select wire:model.live="grupo_id">
-                        <flux:select.option value="">Todos</flux:select.option>
-
-                        @foreach ($this->grupos as $grupo)
-                            <flux:select.option value="{{ $grupo->id }}">
-                                {{ $grupo->asignacionGrupo?->nombre ?? ($grupo->nombre ?? 'Grupo ' . $grupo->id) }}
-                            </flux:select.option>
-                        @endforeach
-                    </flux:select>
-                    <flux:error name="grupo_id" />
-                </flux:field>
-
-                <flux:field>
-                    <flux:label>Filtrar</flux:label>
-                    <flux:input type="search" wire:model.live.debounce.350ms="busqueda"
-                        placeholder="Alumno, CURP o matrícula" />
-                    <flux:error name="busqueda" />
-                </flux:field>
-            </div>
-
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div class="w-full lg:max-w-xl">
-                    <flux:field>
-                        <flux:label>Fecha y lugar</flux:label>
-                        <flux:input type="text" wire:model.live.debounce.500ms="fecha_lugar"
-                            class="uppercase font-semibold"
-                            placeholder="CD. ALTAMIRANO, GRO., A 11 DE JULIO DEL 2025" />
-                        <flux:error name="fecha_lugar" />
-                    </flux:field>
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    @unless ($esProfesor)
-                    <flux:button href="{{ $this->urlExcel }}" target="_blank" variant="primary" icon="arrow-down-tray">
-                        Excel
-                    </flux:button>
-
-                    @endunless
-
-                    <flux:button href="{{ $this->urlPdfGrupo }}" target="_blank" variant="filled" icon="document-text">
-                        PDF grupo
-                    </flux:button>
-
-                    @unless ($esProfesor)
-                    <flux:button type="button" wire:click="descargarPlantillaImportacion" wire:loading.attr="disabled"
-                        wire:target="descargarPlantillaImportacion" variant="outline" icon="document-arrow-down">
-                        <span wire:loading.remove wire:target="descargarPlantillaImportacion">
-                            Plantilla importación
-                        </span>
-                        <span wire:loading wire:target="descargarPlantillaImportacion">
-                            Generando...
-                        </span>
-                    </flux:button>
-                    @endunless
-                </div>
-            </div>
+    @unless ($tablasControlListas)
+        <div class="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200" role="alert">
+            Para activar guardado, revisión e historial de Fichas PRO, ejecuta desde la raíz del proyecto <code class="rounded bg-amber-100 px-2 py-1 dark:bg-amber-900">php artisan migrate</code> y <code class="rounded bg-amber-100 px-2 py-1 dark:bg-amber-900">php artisan optimize:clear</code>. Las fichas existentes siguen disponibles para consulta.
         </div>
+    @endunless
+
+    {{-- Panel de indicadores por filtros, sin atribuir finalización a fichas incompletas --}}
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        @foreach ([
+            ['Total estudiantes', $estadisticasFichas['total'], 'users', 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300'],
+            ['Completas (5/5)', $estadisticasFichas['completas'], 'check-circle', 'bg-lime-50 text-lime-700 dark:bg-lime-500/10 dark:text-lime-300'],
+            ['En proceso', $estadisticasFichas['en_proceso'], 'pencil-square', 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
+            ['Sin captura', $estadisticasFichas['pendientes'], 'clock', 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300'],
+            ['Finalizadas', $estadisticasFichas['finalizadas'], 'shield-check', 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'],
+        ] as [$titulo, $cantidad, $icono, $clases])
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-xs font-bold text-slate-500 dark:text-neutral-400">{{ $titulo }}</p>
+                    <span class="rounded-xl p-2 {{ $clases }}"><flux:icon :name="$icono" class="size-5" /></span>
+                </div>
+                <p class="mt-2 text-3xl font-black text-slate-900 dark:text-white">{{ $cantidad }}</p>
+            </div>
+        @endforeach
     </div>
+
+    {{-- Acciones: las rutas PDF/Word preexistentes se conservan. --}}
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div><h2 class="font-extrabold text-slate-900 dark:text-white">Centro documental</h2>
+                <p class="text-xs text-slate-500 dark:text-neutral-400">Previsualiza el PDF, imprime o descarga Word editable. Respeta los filtros y el periodo.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <flux:button type="button" icon="eye" variant="outline" x-on:click="urlPrevia=@js($this->urlPdfGrupo);vistaPrevia=true">Vista previa del grupo</flux:button>
+                <flux:button href="{{ $this->urlPdfGrupo }}" target="_blank" icon="document-arrow-down" variant="primary">PDF grupo</flux:button>
+                <flux:button href="{{ $this->urlWordGrupo }}" target="_blank" icon="document-text" variant="outline">Word grupo</flux:button>
+                @unless ($esProfesor)
+                    <flux:button href="{{ $this->urlExcel }}" target="_blank" icon="table-cells" variant="outline">Exportar Excel</flux:button>
+                @endunless
+            </div>
+        </div>
+    </section>
 
     @unless ($esProfesor)
-    <div
-        class="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-                <h3 class="text-sm font-black uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                    Importar fichas por grado
-                </h3>
-
-                <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-                    Primero selecciona ciclo, grado y periodo. Descarga la plantilla, llena los campos formativos y
-                    vuelve a subirla.
-                </p>
-
-                @if (!$grado_id)
-                    <p class="mt-2 text-xs font-semibold text-amber-700">
-                        Debes seleccionar un grado antes de descargar o importar.
-                    </p>
-                @endif
+    <details class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold text-slate-900 dark:text-white">
+            <span class="flex items-center gap-2"><flux:icon.arrow-up-tray class="size-5 text-[#006492]" /> Importación Excel inteligente</span>
+            <flux:icon.chevron-down class="size-5 transition-transform group-open:rotate-180" />
+        </summary>
+        <div class="space-y-4 border-t border-slate-100 p-5 dark:border-neutral-800">
+            <p class="text-sm text-slate-500">Selecciona grado, ciclo y periodo. Descarga la plantilla, rellena los campos y valida el archivo antes de confirmar; no se modificarán fichas finalizadas.</p>
+            <div class="flex flex-wrap items-end gap-3">
+                <flux:button type="button" wire:click="descargarPlantillaImportacion" wire:loading.attr="disabled" wire:target="descargarPlantillaImportacion" variant="outline" icon="document-arrow-down">Descargar plantilla</flux:button>
+                <div class="min-w-[210px] flex-1"><flux:input type="file" wire:model="archivo_fichas" accept=".xlsx,.xls" /><flux:error name="archivo_fichas" /></div>
+                <flux:button type="button" wire:click="previsualizarImportacion" wire:loading.attr="disabled" wire:target="previsualizarImportacion,archivo_fichas" variant="primary" icon="magnifying-glass">Validar archivo</flux:button>
             </div>
-
-            <div class="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[360px]">
-                <flux:input type="file" wire:model="archivo_fichas" accept=".xlsx,.xls" />
-
-                <flux:error name="archivo_fichas" />
-
-                <div class="flex flex-wrap gap-2">
-                    <flux:button type="button" wire:click="importarPlantillaFichas" wire:loading.attr="disabled"
-                        wire:target="archivo_fichas,importarPlantillaFichas" variant="primary" icon="arrow-up-tray">
-                        <span wire:loading.remove wire:target="archivo_fichas,importarPlantillaFichas">
-                            Importar fichas
-                        </span>
-
-                        <span wire:loading wire:target="archivo_fichas">
-                            Cargando archivo...
-                        </span>
-
-                        <span wire:loading wire:target="importarPlantillaFichas">
-                            Importando...
-                        </span>
-                    </flux:button>
-
-                    @if ($archivo_fichas)
-                        <flux:button type="button" variant="ghost" wire:click="$set('archivo_fichas', null)">
-                            Quitar archivo
-                        </flux:button>
+            @if ($previsualizacionImportacion)
+                <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm dark:border-sky-500/25 dark:bg-sky-500/10">
+                    <p class="font-bold">Resultado de la validación</p>
+                    <p class="mt-1">{{ $previsualizacionImportacion['total'] }} filas · {{ $previsualizacionImportacion['validos'] }} alumnos válidos · {{ $previsualizacionImportacion['apartados'] }} apartados por importar · {{ $previsualizacionImportacion['reemplazos'] }} textos existentes que serían reemplazados.</p>
+                    @foreach (array_slice($previsualizacionImportacion['errores'], 0, 15) as $error)
+                        <p class="mt-1 text-rose-700 dark:text-rose-300">{{ $error }}</p>
+                    @endforeach
+                    @if ($previsualizacionImportacion['errores'] !== [])
+                        <div class="mt-2"><flux:button size="sm" variant="outline" wire:click="descargarErroresImportacion" icon="document-arrow-down">Descargar errores CSV</flux:button></div>
+                    @endif
+                    @if ($previsualizacionImportacion['errores'] === [] && $previsualizacionImportacion['validos'] > 0)
+                        <div class="mt-3"><flux:button type="button" wire:click="importarPlantillaFichas" wire:loading.attr="disabled" wire:target="importarPlantillaFichas" variant="primary" icon="check">Confirmar importación</flux:button></div>
                     @endif
                 </div>
-            </div>
+            @endif
         </div>
-    </div>
-
+    </details>
+    <details class="group rounded-2xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/40 dark:bg-neutral-900">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold dark:text-white"><span class="flex items-center gap-2"><flux:icon.sparkles class="size-5 text-violet-600" /> Informe pedagógico grupal con IA</span><flux:icon.chevron-down class="size-5 transition-transform group-open:rotate-180" /></summary>
     <div
         class="overflow-hidden rounded-3xl border border-violet-200 bg-white shadow-sm dark:border-violet-900/40 dark:bg-neutral-900">
         <div class="h-1.5 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500"></div>
@@ -265,8 +227,12 @@
             </div>
 
             @if (!empty($informe_grupo_ia))
-                @php($prioridadGrupo = $informe_grupo_ia['prioridad_seguimiento'] ?? 'media')
-                @php($coberturaGrupo = (int) ($resumen_informe_grupo_ia['porcentaje_cobertura'] ?? 0))
+                @php
+                    $prioridadGrupo = $informe_grupo_ia['prioridad_seguimiento'] ?? 'media';
+                @endphp
+                @php
+                    $coberturaGrupo = (int) ($resumen_informe_grupo_ia['porcentaje_cobertura'] ?? 0);
+                @endphp
 
                 <div class="mt-6 border-t border-neutral-200 pt-6 dark:border-neutral-800">
                     <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -513,595 +479,326 @@
             @endif
         </div>
     </div>
+
+    </details>
     @endunless
 
-    <div
-        class="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-                <thead
-                    class="bg-neutral-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-neutral-950 dark:text-neutral-400">
-                    <tr>
-                        <th class="px-4 py-3 text-left">#</th>
-                        <th class="px-4 py-3 text-left">Foto</th>
-                        <th class="min-w-[240px] px-4 py-3 text-left">Nombre completo</th>
-                        <th class="min-w-[170px] px-4 py-3 text-left">CURP</th>
-
-                        @foreach ($campos as $clave => $campoInfo)
-                            <th class="min-w-[190px] px-4 py-3 text-center">
-                                {{ $campoInfo['label'] }}
-                            </th>
-                        @endforeach
-
-                        <th class="px-4 py-3 text-center">PDF</th>
-                    </tr>
-                </thead>
-
-                <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    @forelse ($alumnos as $alumno)
-                        <tr class="hover:bg-indigo-50/40 dark:hover:bg-white/5">
-                            <td class="px-4 py-4 font-bold text-neutral-900 dark:text-white">
-                                {{ $alumnos->firstItem() + $loop->index }}
-                            </td>
-
-                            <td class="px-4 py-4">
-                                @if ($alumno->foto_existe && $alumno->foto_url)
-                                    <img src="{{ $alumno->foto_url }}"
-                                        data-foto-visor data-foto-nombre="{{ $this->nombreCompleto($alumno) }}"
-                                        data-foto-matricula="{{ $alumno->matricula }}" data-foto-contexto="Fichas escolares"
-                                        role="button" tabindex="0" title="Ver fotografía ampliada"
-                                        aria-label="Ampliar fotografía de {{ $this->nombreCompleto($alumno) }}" alt="Foto"
-                                        class="cursor-zoom-in transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#88AC2E] h-11 w-11 rounded-full object-cover ring-2 ring-white shadow">
-                                @else
-                                    <div
-                                        class="grid h-11 w-11 place-items-center rounded-full bg-indigo-100 text-xl shadow-sm dark:bg-indigo-500/15">
-                                        @if ($alumno->genero == 'M')
-                                            👧
-                                        @else
-                                            👦
-                                        @endif
-                                    </div>
-                                @endif
-                            </td>
-
-                            <td class="px-4 py-4 font-semibold text-neutral-900 dark:text-white">
-                                {{ $this->alumnoNombre($alumno) }}
-
-                                <div class="mt-1 text-xs font-normal text-neutral-500">
-                                    {{ $alumno->grado?->nombre }} · Grupo
-                                    {{ $alumno->grupo?->asignacionGrupo?->nombre ?? 'S/G' }}
-                                </div>
-                            </td>
-
-                            <td class="px-4 py-4 font-mono text-xs text-neutral-700 dark:text-neutral-300">
-                                {{ $alumno->curp }}
-                            </td>
-
-                            @foreach ($campos as $clave => $campoInfo)
-                                @php($completo = filled($fichasResumen[$alumno->id][$clave] ?? null))
-
-                                <td class="px-4 py-4 text-center">
-                                    <flux:button type="button"
-                                        wire:click="abrirModal({{ $alumno->id }}, '{{ $clave }}')"
-                                        :variant="$completo ? 'primary' : 'filled'" size="sm" square
-                                        title="Capturar {{ $campoInfo['label'] }}">
-                                        @if ($completo)
-                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z" />
-                                            </svg>
-                                        @else
-                                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path
-                                                    d="M5 19h1.4l9.6-9.6L14.6 8 5 17.6V19Zm13.7-10.3-3.4-3.4 1.1-1.1a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1l-1.1 1.1Z" />
-                                            </svg>
-                                        @endif
-                                    </flux:button>
-                                </td>
-                            @endforeach
-
-                            <td class="px-4 py-4 text-center">
-                                <flux:button href="{{ $this->urlPdfAlumno($alumno->id) }}" target="_blank"
-                                    variant="filled" size="sm" square title="Descargar ficha PDF">
-                                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                                        <path
-                                            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 1.5L18.5 9H13V3.5ZM8 13h8v2H8v-2Zm0 4h8v2H8v-2Z" />
-                                    </svg>
-                                </flux:button>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="{{ 5 + count($campos) }}" class="px-4 py-12 text-center text-neutral-500">
-                                No se encontraron alumnos de preescolar con los filtros seleccionados.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+    <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5 dark:border-neutral-800">
+            <div><h2 class="font-black text-lg text-slate-900 dark:text-white">Estudiantes de Preescolar</h2><p class="mt-1 text-xs text-slate-500 dark:text-neutral-400">{{ $alumnos->total() }} resultados · {{ $this->periodoNombre() }}</p></div>
+            <div class="flex items-center rounded-xl border border-slate-200 p-1 dark:border-neutral-700">
+                <flux:button type="button" size="sm" :variant="$vistaAlumnos === 'tabla' ? 'primary' : 'ghost'" icon="list-bullet" wire:click="$set('vistaAlumnos', 'tabla')">Tabla</flux:button>
+                <flux:button type="button" size="sm" :variant="$vistaAlumnos === 'tarjetas' ? 'primary' : 'ghost'" icon="squares-2x2" wire:click="$set('vistaAlumnos', 'tarjetas')">Tarjetas</flux:button>
+            </div>
         </div>
-
-        <div
-            class="flex flex-col gap-3 border-t border-neutral-100 px-5 py-4 text-sm dark:border-neutral-800 md:flex-row md:items-center md:justify-between">
-            <p class="font-semibold text-neutral-600 dark:text-neutral-400">
-                {{ $alumnos->total() }} registros totales
-            </p>
-
-            {{ $alumnos->links() }}
-        </div>
-    </div>
-
-    @if ($modalAbierto)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/70 p-4 backdrop-blur-sm"
-            wire:key="modal-ficha">
-            <div
-                class="max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-neutral-900">
-                <div
-                    class="sticky top-0 z-20 flex items-start justify-between gap-4 bg-indigo-600 px-5 py-4 text-white">
-                    <h3 class="text-base font-black uppercase leading-6">
-                        {{ $campos[$campo]['label'] ?? '' }} |
-                        {{ $this->alumnoNombre($this->alumnoModal) }} |
-                        {{ $this->periodoNombre() }}
-                    </h3>
-
-                    <flux:button type="button" wire:click="cerrarModal" variant="ghost" size="sm" square
-                        class="text-white hover:bg-white/15" wire:loading.attr="disabled"
-                        wire:target="generarDescripcionIA,guardar">
-                        ✕
-                    </flux:button>
-                </div>
-
-                <div class="grid gap-5 p-5 lg:grid-cols-[270px_minmax(0,1fr)]">
-                    @if ($campo !== 'recomendaciones')
-                        <div
-                            class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
-                            <div class="border-b border-neutral-100 px-5 py-4 text-sm dark:border-neutral-800">
-                                Descripción |
-                                <strong>{{ $campos[$campo]['label'] ?? '' }}</strong>
-                            </div>
-
-                            <div class="space-y-4 px-5 py-5 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
-                                <p class="text-justify">
-                                    {{ $campos[$campo]['descripcion'] ?? '' }}
-                                </p>
-
-                                <div
-                                    class="grid min-h-32 place-items-center rounded-xl border border-dashed border-indigo-200 bg-indigo-50 p-4 text-center text-xs font-black uppercase tracking-wide text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                    <img src="{{ asset($campos[$campo]['imagen'] ?? '') }}"
-                                        class="max-h-40 object-contain" alt="{{ $campos[$campo]['label'] ?? '' }}">
-                                </div>
+        @if ($vistaAlumnos === 'tarjetas')
+            <div class="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+                @forelse ($alumnos as $alumno)
+                    @php
+                        $completados = collect(array_keys($campos))->filter(fn ($key) => filled(trim(strip_tags((string) ($fichasResumen[$alumno->id][$key] ?? '')))))->count();
+                        $porcentaje = (int) round($completados * 100 / max(count($campos), 1));
+                        $estado = $estadosPagina[$alumno->id] ?? 'borrador';
+                    @endphp
+                    <article wire:key="ficha-card-{{ $alumno->id }}" class="rounded-2xl border border-slate-200 p-4 transition hover:border-[#006492]/50 hover:shadow-md dark:border-neutral-800">
+                        <div class="flex items-center gap-3">
+                            @if ($alumno->foto_existe && $alumno->foto_url)
+                                <img src="{{ $alumno->foto_url }}" alt="Foto" class="h-12 w-12 rounded-full object-cover" data-foto-visor data-foto-nombre="{{ $this->alumnoNombre($alumno) }}" data-foto-matricula="{{ $alumno->matricula }}" />
+                            @else
+                                <div class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20"> <flux:icon.user class="size-6" /> </div>
+                            @endif
+                            <div class="min-w-0 flex-1"><h3 class="truncate font-bold text-slate-900 dark:text-white">{{ $this->alumnoNombre($alumno) }}</h3>
+                                <p class="text-xs text-slate-500">{{ $alumno->grado?->nombre }} · {{ $alumno->grupo?->asignacionGrupo?->nombre ?? 'S/G' }}</p>
+                                <p class="truncate font-mono text-xs text-slate-400">{{ $alumno->matricula }}</p>
                             </div>
                         </div>
-                    @endif
+                        <div class="mt-4 flex items-center justify-between text-xs"><span class="font-bold text-slate-600 dark:text-neutral-300">{{ $completados }}/{{ count($campos) }} apartados</span>
+                            <span class="font-bold {{ $estado === 'finalizada' ? 'text-emerald-700' : 'text-sky-700' }}">{{ $estado === 'finalizada' ? 'Finalizada' : ($estado === 'en_revision' ? 'En revisión' : ($completados === count($campos) ? 'Lista para revisar' : 'Borrador')) }}</span>
+                        </div>
+                        <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800"><div class="h-full rounded-full bg-gradient-to-r from-[#006492] to-[#88ac2e]" style="width: {{ $porcentaje }}%"></div></div>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <flux:button type="button" wire:click="abrirModal({{ $alumno->id }})" wire:loading.attr="disabled" wire:target="abrirModal" size="sm" variant="primary" icon="pencil-square">{{ $estado === 'finalizada' ? 'Consultar' : 'Editar' }}</flux:button>
+                            <flux:button type="button" size="sm" variant="outline" icon="eye" x-on:click="urlPrevia=@js($this->urlPdfAlumno($alumno->id));vistaPrevia=true">PDF</flux:button>
+                            <flux:button href="{{ $this->urlWordAlumno($alumno->id) }}" target="_blank" size="sm" variant="ghost" icon="document-text">Word</flux:button>
+                        </div>
+                        @include('livewire.accion.partials.ficha-acciones-estado', ['estadoFicha' => $estado, 'cantidadCapturada' => $completados])
+                    </article>
+                @empty
+                    <div class="col-span-full rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">No hay alumnos con los filtros seleccionados.</div>
+                @endforelse
+            </div>
+        @else
+            <div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-100 text-sm dark:divide-neutral-800">
+                <thead class="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-neutral-950"><tr>
+                    <th class="px-5 py-4">Estudiante</th><th class="px-4 py-4">Matrícula / CURP</th><th class="px-4 py-4">Avance</th><th class="px-4 py-4">Estado</th><th class="px-4 py-4">Acciones</th>
+                </tr></thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-neutral-800">
+                @forelse ($alumnos as $alumno)
+                    @php
+                        $completados = collect(array_keys($campos))->filter(fn ($key) => filled(trim(strip_tags((string) ($fichasResumen[$alumno->id][$key] ?? '')))))->count();
+                        $porcentaje = (int) round($completados * 100 / max(count($campos), 1));
+                        $estado = $estadosPagina[$alumno->id] ?? 'borrador';
+                    @endphp
+                    <tr wire:key="ficha-row-{{ $alumno->id }}" class="transition hover:bg-sky-50/50 dark:hover:bg-white/5">
+                        <td class="px-5 py-4"><div class="flex items-center gap-3">
+                            @if ($alumno->foto_existe && $alumno->foto_url)
+                                <img src="{{ $alumno->foto_url }}" alt="Foto" class="h-11 w-11 shrink-0 rounded-full object-cover" data-foto-visor data-foto-nombre="{{ $this->alumnoNombre($alumno) }}" data-foto-matricula="{{ $alumno->matricula }}" />
+                            @else
+                                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20"><flux:icon.user class="size-5" /></span>
+                            @endif
+                            <div><div class="min-w-[190px] font-bold text-slate-900 dark:text-white">{{ $this->alumnoNombre($alumno) }}</div><div class="text-xs text-slate-500">{{ $alumno->grado?->nombre }} · {{ $alumno->grupo?->asignacionGrupo?->nombre ?? 'S/G' }}</div></div>
+                        </div></td>
+                        <td class="px-4 py-4 text-xs text-slate-600 dark:text-neutral-300"><div class="font-semibold">{{ $alumno->matricula }}</div><div class="mt-1 font-mono text-[11px] text-slate-500">{{ $alumno->curp }}</div></td>
+                        <td class="min-w-[150px] px-4 py-4"><div class="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-neutral-300"><span>{{ $completados }}/5</span><span>{{ $porcentaje }}%</span></div>
+                            <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800"><div class="h-full rounded-full bg-gradient-to-r from-[#006492] to-[#88ac2e]" style="width: {{ $porcentaje }}%"></div></div>
+                        </td>
+                        <td class="px-4 py-4"><span @class(['inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' => $estado === 'finalizada', 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' => $estado === 'en_revision', 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' => $estado === 'borrador'])>{{ $estado === 'finalizada' ? 'Finalizada' : ($estado === 'en_revision' ? 'En revisión' : 'Borrador') }}</span></td>
+                        <td class="min-w-[300px] px-4 py-4"><div class="flex flex-wrap items-center gap-2">
+                            <flux:button type="button" size="sm" variant="primary" icon="pencil-square" wire:click="abrirModal({{ $alumno->id }})" wire:loading.attr="disabled" wire:target="abrirModal">{{ $estado === 'finalizada' ? 'Ver ficha' : 'Editar' }}</flux:button>
+                            <flux:button type="button" size="sm" variant="outline" icon="eye" x-on:click="urlPrevia=@js($this->urlPdfAlumno($alumno->id));vistaPrevia=true">PDF</flux:button>
+                            <flux:button href="{{ $this->urlWordAlumno($alumno->id) }}" size="sm" target="_blank" variant="ghost" icon="document-text">Word</flux:button>
+                            @include('livewire.accion.partials.ficha-acciones-estado', ['estadoFicha' => $estado, 'cantidadCapturada' => $completados])
+                        </div></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="px-5 py-12 text-center text-slate-500">No se encontraron alumnos de Preescolar.</td></tr>
+                @endforelse
+                </tbody>
+            </table></div>
+        @endif
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 dark:border-neutral-800"><p class="text-xs font-semibold text-slate-500">{{ $alumnos->total() }} estudiantes</p>{{ $alumnos->links() }}</div>
+    </section>
 
-                    <div @class(['min-w-0', 'lg:col-span-2' => $campo === 'recomendaciones'])>
-                        @unless ($esProfesor)
-                        <div wire:init="verificarGroq"
-                            class="mb-5 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 shadow-sm dark:border-emerald-500/30 dark:from-emerald-500/10 dark:via-neutral-900 dark:to-cyan-500/10">
-                            <div class="border-b border-emerald-100 px-5 py-4 dark:border-emerald-500/20">
-                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div class="flex items-start gap-3">
-                                        <div
-                                            class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-600 text-xl text-white shadow-sm">
-                                            ✨
-                                        </div>
-
-                                        <div>
-                                            <h4 class="font-black text-emerald-950 dark:text-emerald-100">
-                                                Asistente de redacción con GroqCloud
-                                            </h4>
-
-                                            <p class="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">
-                                                La redacción se genera mediante GroqCloud. El sistema elimina
-                                                identificadores directos antes de enviar el texto.
-                                            </p>
-                                        </div>
+    {{-- Contenedor ESTABLE: el root del modal nunca se crea o destruye durante un morph Livewire.
+         Esto evita que un update del editor remonte o borre el panel de alumnos. --}}
+    <div wire:key="ficha-pro-modal-shell" x-cloak x-show="$wire.modalAbierto"
+         x-transition.opacity.duration.150ms
+         style="display: none;"
+         class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-2 backdrop-blur-sm sm:p-4"
+         role="dialog" aria-modal="true" aria-label="Editor de ficha descriptiva"
+         x-on:click.self="window.cerrarFichaSeguro?.()">
+    @if ($modalAbierto && $this->alumnoModal)
+        @php
+            $resumenModal = \App\Models\FichaDescriptiva::query()->where('inscripcion_id', $inscripcion_id)->where('ciclo_escolar_id', $ciclo_escolar_id)->where('periodo', $periodo)->pluck('descripcion', 'campo');
+            $estadoModal = $tablasControlListas ? (\App\Models\FichaEstado::query()->where('inscripcion_id', $inscripcion_id)->where('ciclo_escolar_id', $ciclo_escolar_id)->where('periodo', $periodo)->value('estado') ?? 'borrador') : 'borrador';
+        @endphp
+        <div wire:key="ficha-editor-content-{{ $inscripcion_id }}" class="flex max-h-[96vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-neutral-900">
+                <div class="flex items-center justify-between gap-4 bg-gradient-to-r from-[#006492] to-[#0078a6] px-5 py-4 text-white">
+                    <div class="min-w-0"><p class="text-[11px] font-black uppercase tracking-widest text-white/75">Editor integral · {{ $this->periodoCorto($periodo) }}</p>
+                        <h2 class="truncate text-lg font-black">{{ $this->alumnoNombre($this->alumnoModal) }}</h2>
+                        <p class="text-xs text-white/80">{{ $this->alumnoModal?->grado?->nombre }} · Captura formativa institucional</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="hidden rounded-full bg-white/15 px-3 py-1 text-xs font-semibold sm:block">{{ $estadoModal === 'finalizada' ? 'Ficha finalizada' : 'Borrador editable' }}</span>
+                        <flux:button type="button" variant="ghost" size="sm" icon="x-mark" x-on:click="window.cerrarFichaSeguro?.()" class="text-white">Cerrar</flux:button>
+                    </div>
+                </div>
+                <div class="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[260px_minmax(0,1fr)]">
+                    <aside class="border-b border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950 lg:border-b-0 lg:border-r">
+                        <p class="mb-3 px-2 text-xs font-black uppercase tracking-wide text-slate-500">Campos formativos</p>
+                        <div class="flex flex-row gap-1 overflow-x-auto lg:flex-col">
+                            @foreach ($campos as $clave => $informacion)
+                                @php
+                                    $capturado = filled(trim(strip_tags((string) ($resumenModal[$clave] ?? ''))));
+                                @endphp
+                                <button type="button" wire:key="nav-{{ $clave }}" x-on:click="window.cambiarCampoFicha?.(@js($clave))" @class(['flex shrink-0 items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-semibold transition lg:w-full', 'bg-[#006492] text-white shadow-sm' => $campo === $clave, 'text-slate-600 hover:bg-slate-200 dark:text-neutral-300 dark:hover:bg-neutral-800' => $campo !== $clave])>
+                                    <span class="grid size-6 shrink-0 place-items-center rounded-full {{ $capturado ? 'bg-lime-100 text-lime-700' : 'bg-white/15 text-current' }}">{{ $capturado ? '✓' : $loop->iteration }}</span>
+                                    <span class="max-w-40">{{ $informacion['label'] }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                        <div class="mt-5 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
+                            <p class="font-bold text-slate-700 dark:text-neutral-100">Seguimiento seguro</p>
+                            <p class="mt-1">Se guarda automáticamente después de dejar de escribir. También puedes guardar manualmente.</p>
+                        </div>
+                        <div class="mt-4"><p class="text-xs font-bold text-slate-600 dark:text-neutral-300">Últimos movimientos</p>
+                            @forelse ($this->historialModal as $movimiento)
+                                <p class="mt-2 border-b border-slate-100 pb-2 text-[11px] text-slate-500 dark:border-neutral-800">{{ ucfirst($movimiento->accion) }} · {{ $movimiento->campo ?? 'Ficha' }} · {{ $movimiento->created_at?->format('d/m H:i') }}</p>
+                            @empty
+                                <p class="mt-2 text-xs text-slate-400">Aún no hay movimientos registrados.</p>
+                            @endforelse
+                        </div>
+                    </aside>
+                    <div class="min-w-0 space-y-4 p-4 sm:p-6">
+                        <div class="flex flex-wrap items-start justify-between gap-3"><div>
+                            <h3 class="text-xl font-black text-slate-900 dark:text-white">{{ $campos[$campo]['label'] ?? 'Descripción' }}</h3>
+                            <p class="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-neutral-400">{{ $campos[$campo]['descripcion'] ?? '' }}</p>
+                        </div><span @class(['rounded-full px-3 py-1 text-xs font-bold', 'bg-emerald-100 text-emerald-700' => $estadoGuardado === 'guardado', 'bg-amber-100 text-amber-700' => $estadoGuardado !== 'guardado'])>{{ $estadoGuardado === 'guardado' ? 'Guardado' : 'Cambios pendientes' }}</span></div>
+                        @if ($estadoModal === 'finalizada')
+                            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Esta ficha está finalizada. La administración debe reabrirla antes de editar.</div>
+                        @endif
+                        <flux:field>
+                            <flux:label>Descripción pedagógica</flux:label>
+                            <div wire:ignore><textarea id="editor_ficha_descriptiva" data-solo-lectura="{{ $estadoModal === 'finalizada' ? '1' : '0' }}" {{ $estadoModal === 'finalizada' ? 'readonly' : '' }}>{{ $descripcion }}</textarea></div>
+                            <div class="mt-2 flex items-center justify-between text-xs text-slate-500"><span>Máximo 5000 caracteres HTML · Guarda por apartado</span><flux:error name="descripcion" /></div>
+                        </flux:field>
+                        @if (!$esProfesor && $estadoModal !== 'finalizada')
+                            <details class="group rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/30 dark:bg-emerald-500/10" open>
+                                <summary class="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-extrabold text-emerald-800 dark:text-emerald-200"><span class="flex items-center gap-2"><flux:icon.sparkles class="size-5" /> Asistente pedagógico IA · Groq</span><flux:icon.chevron-down class="size-4 group-open:rotate-180" /></summary>
+                                <div class="space-y-3 border-t border-emerald-200 p-4 dark:border-emerald-500/30">
+                                    <p class="text-xs text-slate-600 dark:text-neutral-300">{{ $groq_mensaje }} · Para utilizar Groq, verifica la conexión con el botón correspondiente. Las propuestas requieren aprobación manual y no deben incluir datos sensibles.</p>
+                                    <flux:textarea wire:model="observaciones_ia" rows="3" label="Observaciones o ideas para la IA" placeholder="Describe únicamente hechos observables y necesidades pedagógicas..." />
+                                    <div class="flex flex-wrap gap-2">
+                                        <flux:button type="button" variant="primary" icon="sparkles" x-on:click="window.generarDescripcionFichaIA?.()" wire:loading.attr="disabled" wire:target="generarDescripcionIA" :disabled="!($groq_disponible && $groq_modelo_disponible)">Generar sugerencia</flux:button>
+                                        <flux:button type="button" variant="ghost" icon="arrow-path" wire:click="verificarGroq" size="sm">Verificar conexión</flux:button>
                                     </div>
-
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span @class([
-                                            'rounded-full border px-3 py-1 text-xs font-bold',
-                                            'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300' => is_null(
-                                                $groq_disponible),
-                                            'border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300' =>
-                                                $groq_disponible && $groq_modelo_disponible,
-                                            'border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300' =>
-                                                $groq_disponible && !$groq_modelo_disponible,
-                                            'border-red-200 bg-red-100 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300' =>
-                                                $groq_disponible === false,
-                                        ])>
-                                            @if (is_null($groq_disponible))
-                                                Verificando...
-                                            @elseif ($groq_disponible && $groq_modelo_disponible)
-                                                GroqCloud listo
-                                            @elseif ($groq_disponible)
-                                                Modelo no disponible
-                                            @else
-                                                GroqCloud sin conexión
-                                            @endif
-                                        </span>
-
-                                        <flux:button type="button" variant="ghost" size="sm" icon="arrow-path"
-                                            wire:click="verificarGroq" wire:loading.attr="disabled"
-                                            wire:target="verificarGroq,generarDescripcionIA">
-                                            <span wire:loading.remove wire:target="verificarGroq">
-                                                Verificar
-                                            </span>
-
-                                            <span wire:loading wire:target="verificarGroq">
-                                                Revisando...
-                                            </span>
-                                        </flux:button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="space-y-4 p-5">
-                                <div @class([
-                                    'rounded-xl border px-4 py-3 text-xs leading-5',
-                                    'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300' => is_null(
-                                        $groq_disponible),
-                                    'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200' =>
-                                        $groq_disponible && $groq_modelo_disponible,
-                                    'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200' =>
-                                        $groq_disponible && !$groq_modelo_disponible,
-                                    'border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200' =>
-                                        $groq_disponible === false,
-                                ])>
-                                    <div class="font-semibold">
-                                        {{ $groq_mensaje }}
-                                    </div>
-
-                                    <div class="mt-1">
-                                        Modelo configurado:
-                                        <code
-                                            class="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/10">{{ $groq_modelo }}</code>
-                                    </div>
-
-                                    @if ($groq_disponible && !$groq_modelo_disponible)
-                                        <div class="mt-2">
-                                            Cambia <code
-                                                class="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/10">GROQ_MODEL</code>
-                                            por un modelo activo de tu cuenta y ejecuta <code
-                                                class="rounded bg-black/5 px-1.5 py-0.5 font-mono dark:bg-white/10">php
-                                                artisan optimize:clear</code>.
+                                    <flux:error name="observaciones_ia" />
+                                    @if ($propuesta_ia !== '')
+                                        <div class="grid gap-3 lg:grid-cols-2">
+                                            <div class="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-neutral-700 dark:bg-neutral-900"><p class="mb-2 font-black">Texto original</p><div class="prose prose-sm max-w-none dark:prose-invert">{!! app(\App\Services\HtmlSanitizerService::class)->sanitize($texto_original_ia) !!}</div></div>
+                                            <div class="rounded-xl border border-emerald-200 bg-white p-3 text-xs dark:bg-neutral-900"><p class="mb-2 font-black text-emerald-700">Propuesta de IA</p><div class="prose prose-sm max-w-none dark:prose-invert">{!! app(\App\Services\HtmlSanitizerService::class)->sanitize($propuesta_ia) !!}</div></div>
                                         </div>
-                                    @elseif ($groq_disponible === false)
-                                        <div class="mt-2">
-                                            Revisa tu conexión a internet, la API key y pulsa
-                                            <strong>Verificar</strong>.
-                                        </div>
+                                        <div class="flex gap-2"><flux:button type="button" wire:click="aceptarSugerenciaIA" variant="primary" icon="check">Aceptar propuesta</flux:button><flux:button type="button" wire:click="descartarSugerenciaIA" variant="outline">Descartar</flux:button></div>
                                     @endif
                                 </div>
-
-                                <flux:field>
-                                    <flux:label>
-                                        @if ($campo === 'recomendaciones')
-                                            Observaciones adicionales para las recomendaciones
-                                        @else
-                                            Ideas u observaciones de la educadora
-                                        @endif
-                                    </flux:label>
-
-                                    <flux:textarea wire:model="observaciones_ia" rows="4"
-                                        placeholder="{{ $campo === 'recomendaciones'
-                                            ? 'Ejemplo: reforzar en casa la expresión de emociones, respetar turnos y mantener rutinas de lectura...'
-                                            : 'Ejemplo: reconoce algunas vocales, participa con entusiasmo, escribe su nombre con apoyo y requiere acompañamiento para respetar turnos...' }}" />
-
-                                    <flux:description>
-                                        @if ($campo === 'recomendaciones' && config('groq.include_context', false))
-                                            También se utilizarán los demás campos formativos capturados durante este
-                                            periodo.
-                                        @elseif ($campo === 'recomendaciones')
-                                            Solo se utilizarán las observaciones escritas en este cuadro y el texto
-                                            actual.
-                                        @else
-                                            Puedes escribir ideas breves; GroqCloud las convertirá en una descripción
-                                            pedagógica completa.
-                                        @endif
-                                        No escribas nombre, CURP, matrícula, domicilio, teléfono ni datos médicos.
-                                    </flux:description>
-
-                                    <flux:error name="observaciones_ia" />
-                                </flux:field>
-
-                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div class="flex flex-wrap gap-2">
-                                        <flux:button type="button" variant="primary" icon="sparkles"
-                                            x-on:click="window.generarDescripcionFichaIA?.()"
-                                            wire:loading.attr="disabled"
-                                            wire:target="generarDescripcionIA,verificarGroq"
-                                            :disabled="!($groq_disponible && $groq_modelo_disponible)">
-                                            <span wire:loading.remove wire:target="generarDescripcionIA">
-                                                @if ($campo === 'recomendaciones')
-                                                    Generar recomendaciones
-                                                @elseif (filled(strip_tags($descripcion ?? '')))
-                                                    Mejorar descripción
-                                                @else
-                                                    Generar descripción
-                                                @endif
-                                            </span>
-
-                                            <span wire:loading wire:target="generarDescripcionIA">
-                                                Generando descripción...
-                                            </span>
-                                        </flux:button>
-
-                                        @if (filled($observaciones_ia ?? ''))
-                                            <flux:button type="button" variant="ghost"
-                                                wire:click="$set('observaciones_ia', '')" wire:loading.attr="disabled"
-                                                wire:target="generarDescripcionIA">
-                                                Limpiar observaciones
-                                            </flux:button>
-                                        @endif
-                                    </div>
-
-                                    <div wire:loading wire:target="generarDescripcionIA"
-                                        class="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                stroke="currentColor" stroke-width="4" />
-
-                                            <path class="opacity-75" fill="currentColor"
-                                                d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4Z" />
-                                        </svg>
-
-                                        La respuesta normalmente tarda pocos segundos. No cierres esta ventana.
-                                    </div>
-                                </div>
-
-                                <div
-                                    class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                                    <strong>Revisión docente:</strong>
-                                    GroqCloud crea una sugerencia. La educadora debe comprobar que el texto corresponda
-                                    realmente al desempeño del alumno antes de guardarlo.
-                                </div>
+                            </details>
+                        @endif
+                        <div class="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white/95 py-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
+                            <div class="text-xs font-semibold text-slate-500"><span wire:loading wire:target="guardarBorrador,guardar,generarDescripcionIA">Procesando cambios…</span><span wire:loading.remove wire:target="guardarBorrador,guardar,generarDescripcionIA">{{ $estadoModal === 'finalizada' ? 'Consulta de solo lectura' : 'Autoguardado activo' }}</span></div>
+                            <div class="flex flex-wrap gap-2">
+                                <flux:button type="button" variant="outline" icon="eye" x-on:click="urlPrevia=@js($this->urlPdfAlumno($inscripcion_id));vistaPrevia=true">Vista PDF</flux:button>
+                                @if ($estadoModal !== 'finalizada')
+                                    <flux:button type="button" x-on:click="window.guardarFichaDesdeEditor?.()" variant="primary" wire:loading.attr="disabled" wire:target="guardar,generarDescripcionIA" icon="check">Guardar y cerrar</flux:button>
+                                @endif
+                                <flux:button type="button" x-on:click="window.cerrarFichaSeguro?.()" variant="ghost">Cerrar</flux:button>
                             </div>
-                        </div>
-                        @endunless
-
-                        <flux:field>
-                            <flux:label>
-                                {{ $campos[$campo]['label'] ?? 'Descripción' }}
-                            </flux:label>
-
-                            <div wire:ignore>
-                                <textarea id="editor_ficha_descriptiva"></textarea>
-                            </div>
-
-                            <div class="mt-1 flex items-center justify-between gap-3 text-xs">
-                                <flux:description>
-                                    {{ mb_strlen(strip_tags($descripcion ?? '')) }} caracteres
-                                </flux:description>
-
-                                <flux:error name="descripcion" />
-                            </div>
-                        </flux:field>
-
-                        <div class="mt-5 flex flex-wrap gap-2">
-                            <flux:button type="button" x-on:click="window.guardarFichaDesdeEditor?.()"
-                                wire:loading.attr="disabled" wire:target="guardar,generarDescripcionIA"
-                                variant="primary" icon="check">
-                                <span wire:loading.remove wire:target="guardar">
-                                    Guardar
-                                </span>
-
-                                <span wire:loading wire:target="guardar">
-                                    Guardando...
-                                </span>
-                            </flux:button>
-
-                            <flux:button type="button" wire:click="cerrarModal" wire:loading.attr="disabled"
-                                wire:target="guardar,generarDescripcionIA" variant="outline">
-                                Cancelar
-                            </flux:button>
                         </div>
                     </div>
                 </div>
-            </div>
         </div>
     @endif
+    </div>
+    {{-- Vista previa en el sistema: iframe sólo se monta cuando el usuario la solicita. --}}
+    <div x-cloak x-show="vistaPrevia" class="fixed inset-0 z-[90] grid place-items-center bg-slate-950/80 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Vista previa PDF">
+        <div class="flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-neutral-900">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-neutral-800"><h3 class="font-black text-slate-900 dark:text-white">Vista previa institucional · PDF</h3>
+                <div class="flex gap-2"><a :href="urlPrevia" target="_blank" rel="noopener" class="rounded-lg bg-[#006492] px-4 py-2 text-sm font-bold text-white">Abrir / imprimir</a><flux:button type="button" size="sm" variant="outline" x-on:click="vistaPrevia=false">Cerrar</flux:button></div>
+            </div>
+            <template x-if="vistaPrevia"><iframe :src="urlPrevia" title="Ficha descriptiva PDF" class="w-full flex-1 bg-white"></iframe></template>
+        </div>
+    </div>
 
-    @push('scripts')
-        <script>
-            document.addEventListener('livewire:init', () => {
-                let temporizadorFicha = null;
+    @script
+    <script>
+    // Este bloque se ejecuta cuando Livewire monta el componente; no espera un evento
+    // livewire:init que ya pudo haberse emitido antes de cargar esta vista.
+        let editor = null;
+        let debounce = null;
+        let guardando = null;
+        let actualizandoDesdeServidor = false;
 
-                const esperarTinyMCEFicha = (callback) => {
-                    if (window.tinymce) {
-                        callback();
-                        return;
+        const getTextarea = () => document.getElementById('editor_ficha_descriptiva');
+        const getContenido = () => editor ? editor.getContent() : (getTextarea()?.value ?? '');
+        const limpiarTemporizador = () => { if (debounce) clearTimeout(debounce); debounce = null; };
+        const liberarEditor = () => {
+            limpiarTemporizador();
+            if (window.tinymce && tinymce.get('editor_ficha_descriptiva')) {
+                tinymce.get('editor_ficha_descriptiva').remove();
+            }
+            editor = null;
+        };
+
+        const guardarSiPendiente = async () => {
+            limpiarTemporizador();
+            if (!getTextarea() || getTextarea().dataset.soloLectura === '1') return true;
+            if (guardando) await guardando;
+            if ($wire.get('estadoGuardado') === 'guardado') return true;
+            guardando = (async () => {
+                await $wire.set('descripcion', getContenido(), false);
+                await $wire.call('guardarBorrador');
+            })();
+            try { await guardando; } catch (e) { console.error('Error al guardar la ficha', e); }
+            finally { guardando = null; }
+            return $wire.get('estadoGuardado') === 'guardado';
+        };
+
+        const cambioLocal = () => {
+            if (actualizandoDesdeServidor || !getTextarea() || getTextarea().dataset.soloLectura === '1') return;
+            $wire.set('descripcion', getContenido(), false);
+            $wire.set('estadoGuardado', 'pendiente', false);
+            limpiarTemporizador();
+            debounce = setTimeout(() => { guardarSiPendiente(); }, 1800);
+        };
+
+        const iniciarEditor = async (contenido) => {
+            liberarEditor();
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+            for (let i = 0; i < 25 && !getTextarea(); i++) {
+                await new Promise((r) => setTimeout(r, 80));
+            }
+            const area = getTextarea();
+            if (!area) {
+                console.warn('[Fichas PRO] El editor no está aún en el DOM; conservamos el modal abierto.');
+                return;
+            }
+            area.value = contenido ?? '';
+            area.classList.add('block', 'w-full', 'min-h-[300px]', 'rounded-xl', 'border', 'border-slate-200', 'p-3', 'text-sm', 'dark:bg-neutral-900', 'dark:text-white');
+            area.oninput = cambioLocal;
+            area.onblur = () => guardarSiPendiente();
+            // La edición sigue disponible como textarea si TinyMCE no está instalado.
+            if (!window.tinymce) return;
+            try {
+                await tinymce.init({
+                    target: area, height: 340, readonly: area.dataset.soloLectura === '1', menubar: false, branding: false, promotion: false,
+                    browser_spellcheck: true, language: 'es',
+                    plugins: 'lists link table wordcount code searchreplace fullscreen',
+                    toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link table | fullscreen',
+                    content_style: 'body {font-family:Arial,sans-serif;font-size:14px;line-height:1.7;padding:12px}',
+                    setup: (instancia) => {
+                        instancia.on('init', () => {
+                            editor = instancia;
+                            actualizandoDesdeServidor = true;
+                            instancia.setContent(contenido ?? '');
+                            actualizandoDesdeServidor = false;
+                        });
+                        instancia.on('input change undo redo', cambioLocal);
+                        instancia.on('blur', () => guardarSiPendiente());
                     }
-
-                    let intentos = 0;
-
-                    const intervalo = setInterval(() => {
-                        intentos++;
-
-                        if (window.tinymce) {
-                            clearInterval(intervalo);
-                            callback();
-                            return;
-                        }
-
-                        if (intentos >= 40) {
-                            clearInterval(intervalo);
-
-                            console.error(
-                                'TinyMCE no se pudo cargar. Revisa que el script de TinyMCE esté en el layout.'
-                            );
-                        }
-                    }, 250);
-                };
-
-                const quitarEditorFicha = () => {
-                    if (
-                        window.tinymce &&
-                        tinymce.get('editor_ficha_descriptiva')
-                    ) {
-                        tinymce.get('editor_ficha_descriptiva').remove();
-                    }
-                };
-
-                const obtenerEditorFicha = () => {
-                    return window.tinymce ?
-                        tinymce.get('editor_ficha_descriptiva') :
-                        null;
-                };
-
-                const enviarDescripcionConDebounce = (contenido) => {
-                    clearTimeout(temporizadorFicha);
-
-                    temporizadorFicha = setTimeout(() => {
-                        @this.set('descripcion', contenido, false);
-                    }, 500);
-                };
-
-                const iniciarEditorFicha = (contenido = '') => {
-                    esperarTinyMCEFicha(() => {
-                        setTimeout(() => {
-                            const elemento = document.getElementById(
-                                'editor_ficha_descriptiva'
-                            );
-
-                            if (!elemento) {
-                                return;
-                            }
-
-                            quitarEditorFicha();
-
-                            tinymce.init({
-                                selector: '#editor_ficha_descriptiva',
-                                height: 420,
-                                min_height: 360,
-                                menubar: true,
-                                branding: false,
-                                promotion: false,
-                                language: 'es',
-                                browser_spellcheck: true,
-                                contextmenu: false,
-                                plugins: [
-                                    'lists',
-                                    'link',
-                                    'table',
-                                    'code',
-                                    'preview',
-                                    'fullscreen',
-                                    'searchreplace',
-                                    'wordcount',
-                                    'autoresize'
-                                ].join(' '),
-                                toolbar: [
-                                    'undo redo',
-                                    'blocks',
-                                    'bold italic underline strikethrough',
-                                    'forecolor backcolor',
-                                    'alignleft aligncenter alignright alignjustify',
-                                    'bullist numlist',
-                                    'table link',
-                                    'searchreplace preview fullscreen code'
-                                ].join(' | '),
-                                content_style: `
-                                    body {
-                                        font-family: Arial, Helvetica, sans-serif;
-                                        font-size: 14px;
-                                        line-height: 1.7;
-                                        padding: 12px;
-                                    }
-
-                                    p {
-                                        margin: 0 0 10px;
-                                    }
-
-                                    ul,
-                                    ol {
-                                        margin: 0 0 10px;
-                                    }
-                                `,
-                                setup: function(editor) {
-                                    editor.on('init', function() {
-                                        editor.setContent(contenido ?? '');
-                                    });
-
-                                    editor.on(
-                                        'change undo redo input keyup',
-                                        function() {
-                                            enviarDescripcionConDebounce(
-                                                editor.getContent()
-                                            );
-                                        }
-                                    );
-
-                                    editor.on('blur', function() {
-                                        @this.set(
-                                            'descripcion',
-                                            editor.getContent(),
-                                            false
-                                        );
-                                    });
-                                },
-                            });
-                        }, 250);
-                    });
-                };
-
-                window.sincronizarEditorFicha = async () => {
-                    const editor = obtenerEditorFicha();
-
-                    if (editor) {
-                        await @this.set(
-                            'descripcion',
-                            editor.getContent(),
-                            false
-                        );
-                    }
-                };
-
-                window.generarDescripcionFichaIA = async () => {
-                    await window.sincronizarEditorFicha?.();
-                    await @this.call('generarDescripcionIA');
-                };
-
-                window.guardarFichaDesdeEditor = async () => {
-                    await window.sincronizarEditorFicha?.();
-                    await @this.call('guardar');
-                };
-
-                window.addEventListener('abrir-modal-ficha', (event) => {
-                    iniciarEditorFicha(event.detail.contenido ?? '');
                 });
+            } catch (e) {
+                console.warn('No se pudo inicializar TinyMCE. Se mantiene el editor básico.', e);
+            }
+        };
 
-                window.addEventListener('cerrar-modal-ficha', () => {
-                    clearTimeout(temporizadorFicha);
-                    quitarEditorFicha();
-                });
-
-                window.addEventListener(
-                    'actualizar-editor-ficha',
-                    (event) => {
-                        const contenido = event.detail.contenido ?? '';
-                        const editor = obtenerEditorFicha();
-
-                        if (!editor) {
-                            iniciarEditorFicha(contenido);
-                            return;
-                        }
-
-                        editor.setContent(contenido);
-                        editor.focus();
-
-                        @this.set(
-                            'descripcion',
-                            contenido,
-                            false
-                        );
-                    }
-                );
-
-                document.addEventListener('livewire:navigating', () => {
-                    clearTimeout(temporizadorFicha);
-                    quitarEditorFicha();
-                });
-            });
-        </script>
-    @endpush
+        window.cambiarCampoFicha = async (clave) => {
+            if (!(await guardarSiPendiente())) {
+                alert('No se pudieron guardar los cambios. Revisa la validación antes de cambiar de campo.');
+                return;
+            }
+            await $wire.call('seleccionarCampo', clave);
+        };
+        window.guardarFichaDesdeEditor = async () => {
+            if (!(await guardarSiPendiente())) {
+                alert('Hay cambios sin guardar. Revisa los errores del formulario.');
+                return;
+            }
+            await $wire.call('cerrarModal');
+        };
+        window.cerrarFichaSeguro = async () => {
+            if (!(await guardarSiPendiente())) {
+                alert('No se puede cerrar porque los cambios no fueron guardados. Corrige los errores o copia el texto antes de salir.');
+                return;
+            }
+            await $wire.call('cerrarModal');
+        };
+        window.generarDescripcionFichaIA = async () => {
+            limpiarTemporizador();
+            await $wire.set('descripcion', getContenido(), false);
+            await $wire.call('generarDescripcionIA');
+        };
+        window.addEventListener('abrir-modal-ficha', (event) => iniciarEditor(event.detail.contenido ?? ''));
+        window.addEventListener('actualizar-editor-ficha', async (event) => {
+            const contenido = event.detail.contenido ?? '';
+            actualizandoDesdeServidor = true;
+            if (editor) editor.setContent(contenido);
+            else if (getTextarea()) getTextarea().value = contenido;
+            actualizandoDesdeServidor = false;
+            if ($wire.get('estadoGuardado') === 'pendiente') {
+                limpiarTemporizador();
+                debounce = setTimeout(() => guardarSiPendiente(), 1200);
+            }
+        });
+        window.addEventListener('cerrar-modal-ficha', liberarEditor);
+        document.addEventListener('livewire:navigating', liberarEditor);
+    </script>
+    @endscript
 </div>

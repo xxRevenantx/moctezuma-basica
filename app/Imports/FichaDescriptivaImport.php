@@ -2,19 +2,34 @@
 
 namespace App\Imports;
 
+use App\Http\Controllers\FichaController;
 use App\Models\FichaDescriptiva;
+use App\Models\FichaEstado;
+use App\Models\FichaHistorial;
 use App\Models\Inscripcion;
 use App\Models\Periodos;
 use App\Services\HtmlSanitizerService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
+/** Importación atómica: validación total antes de modificar cualquier ficha. */
 class FichaDescriptivaImport implements ToCollection, WithHeadingRow
 {
-    private ?int $periodoOficialId = null;
+    private ?int $periodoOficialId;
+
+    private const COLUMNAS = [
+        'lenguajes' => ['campo_lenguajes', 'lenguajes'],
+        'saberes' => ['campo_saberes', 'saberes', 'campo_saberes_y_pensamiento_cientifico', 'saberes_y_pensamiento_cientifico', 'campo_saberes_y_pensamiento_cien_tifico'],
+        'etica' => ['campo_etica', 'etica', 'campo_etica_naturaleza_y_sociedades', 'etica_naturaleza_y_sociedades', 'campo_etica_naturaleza_y_socie_dades'],
+        'humano' => ['campo_humano', 'humano', 'campo_de_lo_humano_y_lo_comunitario', 'de_lo_humano_y_lo_comunitario', 'campo_de_lo_humano_y_lo_comu_nitario'],
+        'recomendaciones' => ['recomendaciones', 'recomendacione_s'],
+    ];
+
     public function __construct(
         private readonly int $nivelId,
         private readonly int $gradoId,
@@ -30,109 +45,47 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
             ->value('id');
     }
 
+    public function analizarFilas(Collection $rows): array
+    {
+        $this->verificarMigracion();
+        [$resultado] = $this->preparar($rows);
+        return $resultado;
+    }
+
     public function collection(Collection $rows): void
     {
-        if (!$this->periodoOficialId) {
+        $this->verificarMigracion();
+        [$resumen, $operaciones] = $this->preparar($rows);
+        if ($resumen['errores'] !== []) {
             throw ValidationException::withMessages([
-                'archivo_fichas' => 'No existe un periodo oficial compatible con el ciclo y nivel seleccionados.',
+                'archivo_fichas' => implode("\n", array_slice($resumen['errores'], 0, 20)),
             ]);
         }
 
-        $errores = [];
-
-        foreach ($rows as $index => $row) {
-            $filaExcel = $index + 2;
-
-            $inscripcionId = (int) ($row['id_inscripcion'] ?? 0);
-
-            if ($inscripcionId <= 0) {
-                $errores[] = "Fila {$filaExcel}: falta ID_INSCRIPCION.";
-                continue;
-            }
-
-            $alumno = Inscripcion::query()
-                ->visiblesEnListas()
-                ->where('id', $inscripcionId)
-                ->where('ciclo_escolar_id', $this->cicloEscolarId)
-                ->where('nivel_id', $this->nivelId)
-                ->where('grado_id', $this->gradoId)
-                ->when($this->grupoId, fn($q) => $q->where('grupo_id', $this->grupoId))
-                ->when($this->generacionId, fn($q) => $q->where('generacion_id', $this->generacionId))
-                ->first();
-
-            if (!$alumno) {
-                $errores[] = "Fila {$filaExcel}: el alumno no pertenece al nivel, grado, grupo o generación seleccionada.";
-                continue;
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | IMPORTANTE
-            |--------------------------------------------------------------------------
-            | Estos nombres de campo DEBEN coincidir con FichaController::CAMPOS:
-            |
-            | lenguajes
-            | saberes
-            | etica
-            | humano
-            | recomendaciones
-            |
-            | Por eso aunque el Excel tenga encabezados largos, aquí se guardan
-            | con las llaves reales que usa el sistema.
-            */
-
-            $campos = [
-                'lenguajes' => $this->obtenerValor($row, [
-                    'campo_lenguajes',
-                    'lenguajes',
-                ]),
-
-                'saberes' => $this->obtenerValor($row, [
-                    'campo_saberes',
-                    'saberes',
-                    'campo_saberes_y_pensamiento_cientifico',
-                    'saberes_y_pensamiento_cientifico',
-                    'campo_saberes_y_pensamiento_cien_tifico',
-                ]),
-
-                'etica' => $this->obtenerValor($row, [
-                    'campo_etica',
-                    'etica',
-                    'campo_etica_naturaleza_y_sociedades',
-                    'etica_naturaleza_y_sociedades',
-                    'campo_etica_naturaleza_y_socie_dades',
-                ]),
-
-                'humano' => $this->obtenerValor($row, [
-                    'campo_humano',
-                    'humano',
-                    'campo_de_lo_humano_y_lo_comunitario',
-                    'de_lo_humano_y_lo_comunitario',
-                    'campo_de_lo_humano_y_lo_comu_nitario',
-                ]),
-
-                'recomendaciones' => $this->obtenerValor($row, [
-                    'recomendaciones',
-                    'recomendacione_s',
-                ]),
-            ];
-
-            foreach ($campos as $campo => $descripcion) {
-                $descripcion = $this->limpiarDescripcion($descripcion);
-
-                if ($descripcion === '') {
-                    continue;
+        DB::transaction(function () use ($operaciones) {
+            foreach ($operaciones as $operacion) {
+                /** @var Inscripcion $alumno */
+                $alumno = $operacion['alumno'];
+                // Comprobar otra vez el bloqueo durante el guardado.
+                $estado = FichaEstado::query()->where('inscripcion_id', $alumno->id)
+                    ->where('ciclo_escolar_id', $this->cicloEscolarId)
+                    ->where('periodo', $this->periodo)->lockForUpdate()->first();
+                if ($estado?->estado === 'finalizada') {
+                    throw ValidationException::withMessages(['archivo_fichas' => 'Una ficha se finalizó desde la previsualización. Vuelve a validar el archivo.']);
                 }
-
-                FichaDescriptiva::query()->updateOrCreate(
-                    [
+                foreach ($operacion['campos'] as $campo => $descripcion) {
+                    $claves = [
                         'inscripcion_id' => $alumno->id,
                         'ciclo_escolar_id' => $this->cicloEscolarId,
                         'periodo' => $this->periodo,
-                        'periodo_id' => $this->periodoOficialId,
                         'campo' => $campo,
-                    ],
-                    [
+                    ];
+                    $anterior = (string) (FichaDescriptiva::query()->where($claves)->lockForUpdate()->value('descripcion') ?? '');
+                    if ($anterior === $descripcion) {
+                        continue;
+                    }
+                    FichaDescriptiva::query()->updateOrCreate($claves, [
+                        'periodo_id' => $this->periodoOficialId,
                         'nivel_id' => $alumno->nivel_id,
                         'grado_id' => $alumno->grado_id,
                         'grupo_id' => $alumno->grupo_id,
@@ -140,33 +93,113 @@ class FichaDescriptivaImport implements ToCollection, WithHeadingRow
                         'descripcion' => $descripcion,
                         'capturado_por' => Auth::id(),
                         'fecha_captura' => now(),
-                    ]
-                );
+                    ]);
+                    FichaHistorial::query()->create([
+                        'inscripcion_id' => $alumno->id,
+                        'ciclo_escolar_id' => $this->cicloEscolarId,
+                        'periodo' => $this->periodo,
+                        'campo' => $campo,
+                        'accion' => 'importacion',
+                        'valor_anterior' => $anterior,
+                        'valor_nuevo' => $descripcion,
+                        'user_id' => Auth::id(),
+                    ]);
+                }
+                if ($estado && $estado->estado === 'en_revision') {
+                    $estado->update(['estado' => 'borrador', 'revisado_por' => null, 'revisado_at' => null]);
+                }
             }
-        }
+        });
+    }
 
-        if (count($errores) > 0) {
+    private function verificarMigracion(): void
+    {
+        if (!Schema::hasTable('ficha_estados') || !Schema::hasTable('ficha_historiales')) {
             throw ValidationException::withMessages([
-                'archivo_fichas' => implode("\n", array_slice($errores, 0, 20)),
+                'archivo_fichas' => 'Primero debes ejecutar la migración de Fichas PRO: php artisan migrate.',
             ]);
         }
     }
 
-    private function obtenerValor(Collection $row, array $posiblesColumnas): string
+    private function preparar(Collection $rows): array
     {
-        foreach ($posiblesColumnas as $columna) {
-            $valor = $row[$columna] ?? null;
-
-            if ($valor !== null && trim((string) $valor) !== '') {
-                return (string) $valor;
-            }
+        $errores = [];
+        $seen = [];
+        $operaciones = [];
+        $recuento = ['total' => $rows->count(), 'validos' => 0, 'apartados' => 0, 'reemplazos' => 0, 'errores' => []];
+        if (!$this->periodoOficialId) {
+            $errores[] = 'No hay un periodo oficial configurado para el ciclo y nivel seleccionados.';
         }
-
-        return '';
-    }
-
-    private function limpiarDescripcion(mixed $descripcion): string
-    {
-        return app(HtmlSanitizerService::class)->sanitize((string) $descripcion);
+        foreach ($rows as $indice => $row) {
+            $numeroFila = $indice + 2;
+            $id = (int) ($row['id_inscripcion'] ?? 0);
+            if (!$id) {
+                $errores[] = "Fila {$numeroFila}: falta ID_INSCRIPCION.";
+                continue;
+            }
+            if (isset($seen[$id])) {
+                $errores[] = "Fila {$numeroFila}: ID_INSCRIPCION duplicado ({$id}).";
+                continue;
+            }
+            $seen[$id] = true;
+            $alumno = Inscripcion::query()->visiblesEnListas()->whereKey($id)
+                ->where('ciclo_escolar_id', $this->cicloEscolarId)
+                ->where('nivel_id', $this->nivelId)
+                ->where('grado_id', $this->gradoId)
+                ->when($this->grupoId, fn ($q) => $q->where('grupo_id', $this->grupoId))
+                ->when($this->generacionId, fn ($q) => $q->where('generacion_id', $this->generacionId))
+                ->first();
+            if (!$alumno) {
+                $errores[] = "Fila {$numeroFila}: alumno fuera del grado/grupo/ciclo seleccionado.";
+                continue;
+            }
+            if (FichaEstado::query()->where('inscripcion_id', $id)
+                ->where('ciclo_escolar_id', $this->cicloEscolarId)
+                ->where('periodo', $this->periodo)->where('estado', 'finalizada')->exists()) {
+                $errores[] = "Fila {$numeroFila}: ficha finalizada, no se puede sobrescribir.";
+                continue;
+            }
+            $campos = [];
+            foreach (self::COLUMNAS as $campo => $alias) {
+                $texto = '';
+                foreach ($alias as $columna) {
+                    if (filled($row[$columna] ?? null)) {
+                        $texto = (string) $row[$columna];
+                        break;
+                    }
+                }
+                $texto = app(HtmlSanitizerService::class)->sanitize($texto);
+                if ($texto !== '') {
+                    if (mb_strlen($texto) > 5000) {
+                        $errores[] = "Fila {$numeroFila}: {$campo} supera 5000 caracteres.";
+                    } else {
+                        $campos[$campo] = $texto;
+                    }
+                }
+            }
+            if ($campos === []) {
+                $errores[] = "Fila {$numeroFila}: no tiene descripciones para importar.";
+                continue;
+            }
+            $existentes = FichaDescriptiva::query()
+                ->where('inscripcion_id', $alumno->id)
+                ->where('ciclo_escolar_id', $this->cicloEscolarId)
+                ->where('periodo', $this->periodo)
+                ->whereIn('campo', array_keys($campos))
+                ->pluck('descripcion', 'campo');
+            foreach ($campos as $campo => $texto) {
+                if (filled($existentes[$campo] ?? null) && (string) $existentes[$campo] !== $texto) {
+                    $recuento['reemplazos']++;
+                }
+            }
+            $operaciones[] = ['alumno' => $alumno, 'campos' => $campos];
+            $recuento['validos']++;
+            $recuento['apartados'] += count($campos);
+        }
+        if ($rows->isEmpty()) {
+            $errores[] = 'El archivo Excel no contiene alumnos.';
+        }
+        $recuento['errores'] = $errores;
+        return [$recuento, $operaciones];
     }
 }
