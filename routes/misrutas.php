@@ -67,6 +67,7 @@ use App\Http\Controllers\PersonaNivelController;
 use App\Http\Controllers\PersonaNivelReporteController;
 use App\Http\Controllers\ProfesorHorarioPdfController;
 use App\Http\Controllers\ProfesorPdfController;
+use App\Http\Controllers\ProfesorListasZipController;
 use App\Http\Controllers\ProfesorDocumentoController;
 use App\Http\Controllers\PromediosMateriasPdfController;
 use App\Http\Controllers\RespaldoAcademicoController;
@@ -631,6 +632,10 @@ Route::get('/profesores/documentos/portadas/word', [ProfesorDocumentoController:
 Route::get('/profesores/documentos/portadas/pdf', [ProfesorDocumentoController::class, 'portadasPdf'])
     ->name('profesores.documentos.portadas.pdf');
 
+
+// La exportación multi-docente contiene datos personales; solo administración.
+Route::post('/profesor/listas/exportar/zip', [ProfesorListasZipController::class, 'descargar'])
+    ->middleware('admin')->name('profesor.listas.exportar.zip');
 
 Route::get('/profesor/listas/asistencia/word', [ProfesorPdfController::class, 'asistencia'])
     ->name('profesor.listas.asistencia.word');

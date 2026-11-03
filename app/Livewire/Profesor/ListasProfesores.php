@@ -5,6 +5,7 @@ namespace App\Livewire\Profesor;
 use App\Models\AsignacionMateria;
 use App\Models\CicloEscolar;
 use App\Models\Persona;
+use App\Models\Nivel;
 use App\Models\TallerSesion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,17 @@ class ListasProfesores extends Component
 
     /** @var array<string, int|string|null> */
     public array $periodos_por_carga = [];
+
+    /** Configuración de la exportación ZIP masiva. */
+    public string $exportar_alcance = 'actual';
+    public string $exportar_formato = 'consolidado';
+    public string $exportar_buscar = '';
+    public array $exportar_profesores_ids = [];
+    public string $exportar_nivel_id = '';
+    public bool $exportar_asistencia = true;
+    public bool $exportar_evaluacion = true;
+    public bool $exportar_solo_visibles = false;
+
 
     public function mount(): void
     {
@@ -65,6 +77,7 @@ class ListasProfesores extends Component
         );
         $this->fecha_inicio_asistencia = $this->fecha_corte;
         $this->limpiarFiltrosMaterias();
+        $this->exportar_profesores_ids = [];
     }
 
     public function updatedBuscarProfesor(): void
@@ -103,6 +116,54 @@ class ListasProfesores extends Component
         $this->filtro_dia = '';
         $this->filtro_estado = '';
         $this->periodos_por_carga = [];
+    }
+
+    #[Computed]
+    public function nivelesExportacion(): Collection
+    {
+        return Nivel::query()->orderBy('id')->get(['id', 'nombre']);
+    }
+
+    #[Computed]
+    public function profesoresParaExportar(): Collection
+    {
+        if (! $this->ciclo_escolar_id || ! $this->esAdministrador()) {
+            return collect();
+        }
+        $busqueda = trim($this->exportar_buscar);
+
+        return Persona::query()
+            ->where(function ($query) {
+                $query->whereHas('asignacionMaterias', fn ($q) => $q
+                    ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                    ->whereIn('estado', [AsignacionMateria::ESTADO_ACTIVA, AsignacionMateria::ESTADO_CERRADA]))
+                    ->orWhereHas('tallerSesiones', fn ($q) => $q
+                        ->where('ciclo_escolar_id', $this->ciclo_escolar_id)
+                        ->where('estado', '!=', TallerSesion::ESTADO_ARCHIVADA));
+            })
+            ->when($busqueda !== '', fn ($q) => $q->where(function ($nombre) use ($busqueda) {
+                $nombre->where('nombre', 'like', "%{$busqueda}%")
+                    ->orWhere('apellido_paterno', 'like', "%{$busqueda}%")
+                    ->orWhere('apellido_materno', 'like', "%{$busqueda}%")
+                    ->orWhereRaw("CONCAT_WS(' ', nombre, apellido_paterno, apellido_materno) LIKE ?", ["%{$busqueda}%"])
+                    ->orWhereRaw("CONCAT_WS(' ', apellido_paterno, apellido_materno, nombre) LIKE ?", ["%{$busqueda}%"]);
+            }))
+            ->orderBy('apellido_paterno')->orderBy('apellido_materno')->orderBy('nombre')
+            ->limit(80)->get(['id', 'titulo', 'nombre', 'apellido_paterno', 'apellido_materno']);
+    }
+
+    public function seleccionarProfesoresVisiblesExportacion(): void
+    {
+        $ids = $this->profesoresParaExportar->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $this->exportar_profesores_ids = array_slice(array_values(array_unique(array_merge(
+            array_map('strval', $this->exportar_profesores_ids), $ids
+        ))), 0, 250);
+    }
+
+    public function limpiarSeleccionExportacion(): void
+    {
+        $this->exportar_profesores_ids = [];
+        $this->exportar_buscar = '';
     }
 
     #[Computed]

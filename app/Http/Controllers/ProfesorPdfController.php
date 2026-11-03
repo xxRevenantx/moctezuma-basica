@@ -141,6 +141,55 @@ class ProfesorPdfController extends Controller
                 $tipo === 'asistencia' ? 'landscape' : 'portrait')->stream($nombreArchivo);
     }
 
+    /**
+     * Renderiza exactamente el mismo formato PDF utilizado por las descargas
+     * individuales; el ZIP no mantiene copias separadas de las plantillas.
+     */
+    public function renderizarCargaParaZip(
+        string $tipo,
+        Persona $profesor,
+        CicloEscolar $ciclo,
+        string $tipoCarga,
+        int $cargaId,
+        int $grupoId,
+        int $periodoId,
+        string $fechaCorte,
+        string $fechaInicioAsistencia,
+        ListaAcademicaService $listas,
+    ): string {
+        abort_unless(in_array($tipo, ['asistencia', 'evaluacion'], true), 422);
+
+        $bloque = $tipoCarga === 'materia'
+            ? $this->crearBloqueMateria(
+                (int) $profesor->id, (int) $ciclo->id, $cargaId,
+                $periodoId, $fechaCorte, $tipo, $listas
+            )
+            : $this->crearBloqueTaller(
+                (int) $profesor->id, (int) $ciclo->id, $cargaId,
+                $grupoId, $periodoId, $fechaCorte, $listas
+            );
+
+        abort_if($tipoCarga !== 'materia' && $tipo !== 'asistencia', 422);
+
+        return Pdf::loadView(
+            $tipo === 'asistencia' ? 'pdf.lista_asistencia_pdf' : 'pdf.lista_evaluacion_pdf',
+            [
+                'profesor' => $profesor,
+                'bloques' => collect([$bloque]),
+                'escuela' => Escuela::query()->first(),
+                'fecha' => now()->locale('es')->translatedFormat('d \d\e F \d\e Y'),
+                'fechaCorte' => $listas->fechaCorte($fechaCorte)->locale('es')->translatedFormat('d \d\e F \d\e Y'),
+                'cicloEscolar' => $ciclo,
+                'calendarioAsistencia' => $tipo === 'asistencia'
+                    ? app(AsistenciaBimestralService::class)->construir($fechaInicioAsistencia)
+                    : null,
+            ]
+        )->setPaper(
+            $tipo === 'asistencia' ? 'legal' : 'letter',
+            $tipo === 'asistencia' ? 'landscape' : 'portrait'
+        )->output();
+    }
+
     private function autorizarConsultaDelCiclo(CicloEscolar $ciclo): void
     {
         if (!$ciclo->es_actual) {
