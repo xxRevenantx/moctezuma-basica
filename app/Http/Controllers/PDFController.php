@@ -7254,7 +7254,10 @@ class PDFController extends Controller
 
         $orientacionPdf = match (true) {
             $tipoDescarga === 'grupo' => 'portrait',
-            $tipoDescarga === 'evaluacion' => 'portrait',
+            // La lista de evaluacion de Primaria se imprime en carta vertical.
+            // Los otros niveles conservan la orientacion horizontal de su plantilla.
+            $tipoDescarga === 'evaluacion' && $esPrimaria => 'portrait',
+            $tipoDescarga === 'evaluacion' => 'landscape',
             $tipoDescarga === 'asistencia' => 'landscape',
             $tipoDescarga === 'boletas' => 'portrait',
 

@@ -505,7 +505,9 @@
                 </tr>
                 <tr>
                     <td class="label">CORTE</td>
-                    <td class="valor" colspan="3">{{ $fechaCorte ?? optional($bloque['fecha_corte'] ?? null)->locale('es')->translatedFormat('d \d\e F \d\e Y') }}</td>
+                    <td class="valor" colspan="3">
+                        {{ $fechaCorte ??optional($bloque['fecha_corte'] ?? null)->locale('es')->translatedFormat('d \d\e F \d\e Y') }}
+                    </td>
                 </tr>
             </table>
 
@@ -549,23 +551,7 @@
                 </tr>
             </table>
 
-            <div class="leyenda">
-                <b>Escala de evaluación:</b>
-                10 = Excelente &nbsp;|&nbsp;
-                9 = Muy bien &nbsp;|&nbsp;
-                8 = Bien &nbsp;|&nbsp;
-                7 = Regular &nbsp;|&nbsp;
-                6 = Suficiente &nbsp;|&nbsp;
-                5 = No aprobado
 
-                @if ($esBasica)
-                    <br>
-                    <b>Evaluación cualitativa opcional:</b>
-                    AC = Acreditado &nbsp;|&nbsp;
-                    ED = En desarrollo &nbsp;|&nbsp;
-                    RA = Requiere apoyo
-                @endif
-            </div>
 
             <table class="ponderacion">
                 <thead>
@@ -602,7 +588,7 @@
                         <th rowspan="2" class="alumno">Nombre del alumno</th>
                         <th colspan="5">Evaluación</th>
                         <th rowspan="2" class="head-final final">Cal. Final</th>
-                        <th rowspan="2" class="head-estatus estatus">Estatus</th>
+
                         <th rowspan="2" class="observacion-alumno">Observaciones</th>
                     </tr>
 
@@ -626,11 +612,14 @@
                                 {{ $alumno->nombre }}
                                 @php
                                     $fechaAltaLista = $alumno->fecha_inicio_historica
-                                        ? \Illuminate\Support\Carbon::parse($alumno->fecha_inicio_historica)->startOfDay()
+                                        ? \Illuminate\Support\Carbon::parse(
+                                            $alumno->fecha_inicio_historica,
+                                        )->startOfDay()
                                         : null;
                                 @endphp
                                 @if ($inicioPeriodo && $fechaAltaLista && $fechaAltaLista->gt($inicioPeriodo))
-                                    <span class="alta-posterior">Aún no inscrito antes del {{ $fechaAltaLista->format('d/m/Y') }}</span>
+                                    <span class="alta-posterior">Aún no inscrito antes del
+                                        {{ $fechaAltaLista->format('d/m/Y') }}</span>
                                 @endif
                             </td>
 
@@ -640,7 +629,7 @@
                             <td class="campo">%</td>
                             <td class="campo">%</td>
                             <td class="final"></td>
-                            <td class="estatus"></td>
+
                             <td class="observacion-alumno"></td>
                         </tr>
                     @endforeach
@@ -648,18 +637,6 @@
             </table>
 
 
-            <table class="observaciones">
-                <tr>
-                    <td class="titulo-observaciones">
-                        Observaciones generales del docente
-                    </td>
-
-                    <td>
-                        <span class="linea-observacion"></span>
-                        <span class="linea-observacion"></span>
-                    </td>
-                </tr>
-            </table>
 
             <div class="nota">
                 Nota: Registrar cada criterio de evaluación conforme a la ponderación establecida.

@@ -66,7 +66,8 @@
 
     <style>
         @page {
-            size: letter landscape;
+            /* Respeta la orientacion propia de cada nivel. */
+            size: letter {{ $esListaPrimariaEvaluacion ? 'portrait' : 'landscape' }};
             margin: 14px 22px 20px;
         }
 
@@ -572,6 +573,84 @@
         .fw-700 {
             font-weight: bold;
         }
+
+        @if ($esListaPrimariaEvaluacion)
+            .marca-agua {
+                left: 110px;
+                width: 360px;
+            }
+
+            .logo-izquierdo,
+            .logo-derecho {
+                width: 86px;
+            }
+
+            .logo-izquierdo img,
+            .logo-derecho img {
+                width: 72px;
+            }
+
+            .nombre-escuela {
+                font-size: 17px;
+            }
+
+            .titulo-lista {
+                font-size: 16px;
+            }
+
+            .ciclo {
+                font-size: 12px;
+            }
+
+            .tabla-evaluacion {
+
+                font-size: 7px;
+            }
+
+            .tabla-evaluacion th,
+            .tabla-evaluacion td {
+                overflow-wrap: break-word;
+                word-wrap: break-word;
+            }
+
+            .col-numero,
+            .tbody-numero {
+                width: 16px;
+            }
+
+            .col-alumno,
+            .tbody-alumno {
+                width: 120px;
+            }
+
+            .tbody-alumno {
+                font-size: 7.5px;
+                line-height: 9px;
+            }
+
+            .col-materia {
+                font-size: 6.5px;
+            }
+
+            .col-promedio {
+                width: 38px;
+                font-size: 7px;
+            }
+
+            .col-estatus {
+                width: 44px;
+                font-size: 7px;
+            }
+
+            .col-observacion {
+                width: 64px;
+                font-size: 7px;
+            }
+
+            .firmas td {
+                padding: 0 24px;
+            }
+        @endif
     </style>
 </head>
 
@@ -579,7 +658,7 @@
     <div class="pagina">
 
         @if ($marcaAgua)
-            <img src="{{ $marcaAgua }}" class="marca-agua" alt="">
+            <img src="{{ $marcaAgua }}" class="marca-agua">
         @endif
 
         <div class="contenido">
@@ -829,19 +908,6 @@
                 @endif
 
 
-
-                <table class="observaciones-generales">
-                    <tr>
-                        <td class="titulo-observaciones">
-                            Observaciones generales
-                        </td>
-
-                        <td>
-                            <span class="linea-observacion"></span>
-                            <span class="linea-observacion"></span>
-                        </td>
-                    </tr>
-                </table>
 
                 <div class="nota">
                     Nota: Registrar las calificaciones conforme a los criterios establecidos por el docente y la
