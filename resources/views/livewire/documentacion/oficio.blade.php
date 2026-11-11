@@ -139,6 +139,7 @@
                             wire:keydown.enter.prevent="selectAlumno({{ $selectedIndex }})" />
 
                         <flux:error name="selectedAlumno" />
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Incluye alumnos activos y con baja temporal o definitiva.</p>
                     </flux:field>
 
                     @if (count($alumnos) > 0)
@@ -155,6 +156,11 @@
                                         {{ $alumno['matricula'] }} · {{ $alumno['nivel'] }} ·
                                         {{ $alumno['grado'] }} · Grupo {{ $alumno['grupo'] }}
                                     </div>
+                                    @if (in_array($alumno['estatus'], \App\Models\Inscripcion::ESTATUS_BAJA, true))
+                                        <span class="mt-1 inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                                            {{ $alumno['estatus_etiqueta'] }}
+                                        </span>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>

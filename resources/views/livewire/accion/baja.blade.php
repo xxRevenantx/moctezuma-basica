@@ -599,6 +599,9 @@
                         <th class="px-4 py-3">Estatus</th>
                         <th class="px-4 py-3">Fecha</th>
                         <th class="px-4 py-3">Motivo / observaciones</th>
+                        @if ($this->esModoBajas())
+                            <th class="px-4 py-3 text-right">Acciones</th>
+                        @endif
                     </tr>
                 </thead>
 
@@ -666,13 +669,21 @@
                                         </p>
                                     @endif
                                 </td>
-
-
+                                @if ($this->esModoBajas())
+                                    <td class="px-4 py-4 text-right">
+                                        <flux:button size="sm" variant="primary" icon="arrow-path"
+                                            wire:click="abrirReactivacion({{ $alumnoInactivo->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="abrirReactivacion({{ $alumnoInactivo->id }})">
+                                            Reactivar
+                                        </flux:button>
+                                    </td>
+                                @endif
                             </tr>
                         @endforeach
                     @else
                         <tr>
-                            <td colspan="6" class="px-6 py-16 text-center">
+                            <td colspan="{{ $this->esModoBajas() ? 7 : 6 }}" class="px-6 py-16 text-center">
                                 <div
                                     class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-300">
                                     <flux:icon.check-circle class="h-6 w-6" />
@@ -707,12 +718,12 @@
                 </h2>
                 <p class="text-sm text-slate-500">
                     {{ $this->esModoBajas()
-                        ? 'Consulta únicamente bajas temporales y definitivas del ciclo seleccionado.'
+                        ? 'Consulta las bajas y sus reactivaciones del ciclo seleccionado. El historial se conserva.'
                         : 'Consulta únicamente traslados, suspensiones e inactivaciones del ciclo seleccionado.' }}
                 </p>
             </div>
             <span class="rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
-                {{ $historialMovimientos->total() }} {{ $this->esModoBajas() ? 'baja(s)' : 'movimiento(s)' }}
+                {{ $historialMovimientos->total() }} movimiento(s)
             </span>
         </div>
         <div class="overflow-x-auto">
@@ -734,7 +745,7 @@
                                 <p class="font-black text-slate-900 dark:text-white">{{ $movimiento->inscripcion ? $this->nombreCompleto($movimiento->inscripcion) : 'Alumno no disponible' }}</p>
                                 <p class="text-xs text-slate-500">{{ $movimiento->inscripcion?->matricula ?: 'Sin matrícula' }}</p>
                             </td>
-                            <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black dark:bg-neutral-800">{{ $this->etiquetaEstatus($movimiento->tipo) }}</span></td>
+                            <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black dark:bg-neutral-800">{{ $this->etiquetaMovimiento($movimiento) }}</span></td>
                             <td class="max-w-md px-4 py-3 text-slate-600 dark:text-slate-300">{{ $movimiento->motivo ?: 'Sin motivo' }}</td>
                             <td class="px-4 py-3 text-slate-500">{{ $movimiento->usuario?->name ?: 'Sistema' }}</td>
                         </tr>
@@ -748,5 +759,49 @@
             <div class="border-t border-slate-100 p-4 dark:border-neutral-800">{{ $historialMovimientos->links(data: ['scrollTo' => false]) }}</div>
         @endif
     </section>
+
+    {{-- Confirmación de reactivación: la baja previa se conserva en movimientos_alumnos. --}}
+    @if ($modalReactivacion && $this->esModoBajas())
+        <div class="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"
+            role="dialog" aria-modal="true" aria-labelledby="titulo-reactivacion">
+            <div class="w-full max-w-xl overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl dark:border-emerald-900/30 dark:bg-neutral-900">
+                <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-sky-50 p-6 dark:border-neutral-800 dark:from-emerald-950/30 dark:to-neutral-900">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+                            <flux:icon.arrow-path class="h-5 w-5" />
+                        </span>
+                        <div>
+                            <h2 id="titulo-reactivacion" class="text-lg font-black text-slate-900 dark:text-white">Reactivar estudiante</h2>
+                            <p class="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">{{ $alumnoReactivarNombre }}</p>
+                        </div>
+                    </div>
+                    <flux:button type="button" variant="ghost" icon="x-mark" wire:click="cerrarReactivacion" aria-label="Cerrar" />
+                </div>
+                <form wire:submit="confirmarReactivacion" class="space-y-5 p-6">
+                    <p class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                        Se permitirá el regreso después de una baja temporal o definitiva. No se eliminarán la baja anterior ni sus registros académicos.
+                    </p>
+                    <flux:field>
+                        <flux:label>Fecha de reactivación</flux:label>
+                        <flux:input type="date" wire:model="fecha_reactivacion" max="{{ now()->toDateString() }}" />
+                        <flux:error name="fecha_reactivacion" />
+                    </flux:field>
+                    <flux:field>
+                        <flux:label>Motivo de reactivación</flux:label>
+                        <flux:textarea wire:model="motivo_reactivacion" rows="3" placeholder="Describe el motivo de regreso del estudiante..." />
+                        <flux:error name="motivo_reactivacion" />
+                    </flux:field>
+                    <flux:error name="alumnoReactivarId" />
+                    <div class="flex flex-wrap justify-end gap-3 pt-1">
+                        <flux:button type="button" variant="ghost" wire:click="cerrarReactivacion">Cancelar</flux:button>
+                        <flux:button type="submit" variant="primary" icon="check-circle" wire:loading.attr="disabled" wire:target="confirmarReactivacion">
+                            <span wire:loading.remove wire:target="confirmarReactivacion">Confirmar reactivación</span>
+                            <span wire:loading wire:target="confirmarReactivacion">Reactivando...</span>
+                        </flux:button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 
 </div>

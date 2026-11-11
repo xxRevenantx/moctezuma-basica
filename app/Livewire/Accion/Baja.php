@@ -41,6 +41,12 @@ class Baja extends Component
     public string $observaciones = '';
     public string $fecha_movimiento = '';
 
+    public bool $modalReactivacion = false;
+    public ?int $alumnoReactivarId = null;
+    public string $alumnoReactivarNombre = '';
+    public string $motivo_reactivacion = '';
+    public string $fecha_reactivacion = '';
+
     protected $paginationTheme = 'tailwind';
 
     public function mount(string $slug_nivel, string $modo = 'bajas'): void
@@ -178,6 +184,61 @@ class Baja extends Component
         ]);
     }
 
+    public function abrirReactivacion(int $inscripcionId): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+        abort_unless($this->esModoBajas(), 404);
+
+        // Solo se permite reactivar desde el contexto de ciclo/nivel/generación
+        // que contiene actualmente la baja. No se modifica un ciclo histórico.
+        $alumno = $this->inactivosQuery()->findOrFail($inscripcionId);
+        $this->resetValidation();
+        $this->alumnoReactivarId = $alumno->id;
+        $this->alumnoReactivarNombre = $this->nombreCompleto($alumno);
+        $this->motivo_reactivacion = '';
+        $this->fecha_reactivacion = now()->toDateString();
+        $this->modalReactivacion = true;
+    }
+
+    public function cerrarReactivacion(): void
+    {
+        $this->modalReactivacion = false;
+        $this->alumnoReactivarId = null;
+        $this->alumnoReactivarNombre = '';
+        $this->motivo_reactivacion = '';
+        $this->fecha_reactivacion = '';
+        $this->resetValidation();
+    }
+
+    public function confirmarReactivacion(GestionAcademicaService $service): void
+    {
+        abort_unless(auth()->user()?->is_admin, 403);
+        abort_unless($this->esModoBajas(), 404);
+
+        $datos = $this->validate([
+            'alumnoReactivarId' => ['required', 'integer', 'exists:inscripciones,id'],
+            'motivo_reactivacion' => ['required', 'string', 'min:5', 'max:1000'],
+            'fecha_reactivacion' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        $alumno = $this->inactivosQuery()->findOrFail((int) $datos['alumnoReactivarId']);
+        $service->reactivarBajaEscolar(
+            $alumno,
+            trim($datos['motivo_reactivacion']),
+            auth()->id(),
+            $datos['fecha_reactivacion'],
+        );
+
+        $this->cerrarReactivacion();
+        $this->reiniciarSeleccionYPaginacion();
+        $this->dispatch('swal', [
+            'icon' => 'success',
+            'title' => 'Alumno reactivado',
+            'text' => 'Ya aparece como activo. Su baja anterior sigue documentada en el historial.',
+            'position' => 'top-end',
+        ]);
+    }
+
     public function etiquetaEstatus(?string $estatus): string
     {
         return match ($estatus) {
@@ -192,6 +253,16 @@ class Baja extends Component
             'preinscrito' => 'Preinscrito',
             default => 'Activo',
         };
+    }
+
+    public function etiquetaMovimiento(MovimientoAlumno $movimiento): string
+    {
+        if ($this->esModoBajas() && $movimiento->tipo === 'activo'
+            && in_array($movimiento->estado_anterior['estatus'] ?? null, Inscripcion::ESTATUS_BAJA, true)) {
+            return 'Reactivación de baja';
+        }
+
+        return $this->etiquetaEstatus($movimiento->tipo);
     }
 
     public function textoGrupo($grupo): string
@@ -365,7 +436,15 @@ class Baja extends Component
         return MovimientoAlumno::query()
             ->with(['inscripcion.generacion', 'cicloEscolar', 'usuario'])
             ->whereHas('inscripcion', fn (Builder $query) => $query->where('nivel_id', $this->nivel?->id))
-            ->whereIn('tipo', $this->tiposMovimientoPermitidos())
+            ->where(function (Builder $query): void {
+                $query->whereIn('tipo', $this->tiposMovimientoPermitidos());
+                if ($this->esModoBajas()) {
+                    $query->orWhere(function (Builder $reactivaciones): void {
+                        $reactivaciones->where('tipo', 'activo')
+                            ->whereIn('estado_anterior->estatus', Inscripcion::ESTATUS_BAJA);
+                    });
+                }
+            })
             ->when($this->ciclo_escolar_id, fn (Builder $query) => $query->where('ciclo_escolar_id', $this->ciclo_escolar_id))
             ->when($this->generacion_id, function (Builder $query): void {
                 $query->whereHas('inscripcion', fn (Builder $alumno) => $alumno->where('generacion_id', $this->generacion_id));

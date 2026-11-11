@@ -747,7 +747,17 @@ class Constancia extends Component
         }
     }
 
-    private function procesarDescargaConstancia(): void
+    /** Genera el mismo documento directamente en formato Word. */
+    public function descargarConstanciaWord(): void
+    {
+        try {
+            $this->procesarDescargaConstancia('word');
+        } catch (ValidationException $error) {
+            $this->setErrorBag($error->validator->errors());
+        }
+    }
+
+    private function procesarDescargaConstancia(string $formato = 'pdf'): void
     {
         $this->validate([
             'plantilla_id' => ['required', 'exists:constancia_plantillas,id'],
@@ -769,9 +779,13 @@ class Constancia extends Component
 
             // Solo la constancia individual se guarda en el historial.
             $constancia = $this->crearConstanciaIndividual((int) $this->selectedAlumno['id']);
-            $url = route('misrutas.constancias.pdf', $constancia);
-
-            $this->dispatch('abrir-visor-constancia', url: $url, titulo: 'Constancia · ' . $constancia->folio);
+            if ($formato === 'word') {
+                $this->dispatch('descargar-word-constancia', url: route('misrutas.constancias.word', $constancia));
+            } else {
+                $this->dispatch('abrir-visor-constancia',
+                    url: route('misrutas.constancias.pdf', $constancia),
+                    titulo: 'Constancia · ' . $constancia->folio);
+            }
             return;
         }
 
@@ -835,11 +849,16 @@ class Constancia extends Component
         }
         session()->put('constancias_lotes_recientes', $lotes);
 
-        $this->dispatch(
-            'abrir-visor-constancia',
-            url: route('misrutas.constancias.masivas.pdf', ['lote' => $lote]),
-            titulo: 'Constancias · ' . $alumnos->count() . ' alumnos'
-        );
+        if ($formato === 'word') {
+            $this->dispatch('descargar-word-constancia',
+                url: route('misrutas.constancias.masivas.word', ['lote' => $lote]));
+        } else {
+            $this->dispatch(
+                'abrir-visor-constancia',
+                url: route('misrutas.constancias.masivas.pdf', ['lote' => $lote]),
+                titulo: 'Constancias · ' . $alumnos->count() . ' alumnos'
+            );
+        }
     }
 
     private function obtenerAlumnosParaDescarga()

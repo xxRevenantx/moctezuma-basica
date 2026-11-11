@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Documentos\BladeWordExporter;
+use App\Services\Documentos\ConstanciaWordExporter;
 use App\Models\Constancia;
 use App\Models\ConstanciaPlantilla;
 use App\Models\Escuela;
@@ -46,7 +46,7 @@ class DocumentosPDFController extends Controller
         ];
 
         if (request()->routeIs('misrutas.constancias.word')) {
-            return app(BladeWordExporter::class)->descargar(
+            return app(ConstanciaWordExporter::class)->descargar(
                 'pdf.constancia_estudios_pdf', $datosDocumento, Str::slug($constancia->folio, '_') . '.docx'
             );
         }
@@ -219,7 +219,7 @@ class DocumentosPDFController extends Controller
         })->values()->all();
 
         if (request()->routeIs('misrutas.constancias.masivas.word')) {
-            return app(BladeWordExporter::class)->descargar(
+            return app(ConstanciaWordExporter::class)->descargar(
                 'pdf.constancia_estudios_pdf', ['constanciasMasivas' => $documentos],
                 'CONSTANCIAS_' . Str::upper($payload['modo_descarga'] ?? 'MASIVO') . '_' . now()->format('Ymd_His') . '.docx'
             );

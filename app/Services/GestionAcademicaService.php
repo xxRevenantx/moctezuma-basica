@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Models\CambioAcademico;
+use App\Models\CicloEscolar;
 use App\Models\Generacion;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
 use App\Models\MovimientoAlumno;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -285,13 +287,85 @@ class GestionAcademicaService
         });
     }
 
-    public function cambiarEstatus(Inscripcion $alumno, string $estatus, string $motivo, ?int $usuarioId, ?string $fecha = null): Inscripcion
+    /**
+     * Reactiva una baja temporal o definitiva sin borrar el movimiento histórico.
+     * El expediente y la ubicación académica original permanecen intactos.
+     */
+    public function reactivarBajaEscolar(Inscripcion $alumno, string $motivo, ?int $usuarioId, ?string $fecha = null): Inscripcion
+    {
+        $motivo = trim($motivo);
+        $fecha = $fecha ?: now()->toDateString();
+
+        if (mb_strlen($motivo) < 5 || mb_strlen($motivo) > 1000) {
+            throw ValidationException::withMessages([
+                'motivo_reactivacion' => 'Escribe un motivo de reactivación de entre 5 y 1000 caracteres.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($alumno, $motivo, $usuarioId, $fecha): Inscripcion {
+            $alumno = Inscripcion::query()->lockForUpdate()->findOrFail($alumno->id);
+
+            if (! in_array($alumno->estatus, Inscripcion::ESTATUS_BAJA, true)) {
+                throw ValidationException::withMessages([
+                    'alumnoReactivarId' => 'El alumno ya no tiene una baja escolar vigente. Actualiza la página.',
+                ]);
+            }
+
+            $fechaBaja = $alumno->fecha_baja ?: $alumno->fecha_estatus;
+            if ($fechaBaja && Carbon::parse($fecha)->startOfDay()->lt(Carbon::parse($fechaBaja)->startOfDay())) {
+                throw ValidationException::withMessages([
+                    'fecha_reactivacion' => 'La reactivación no puede ser anterior a la fecha de baja.',
+                ]);
+            }
+
+            $ciclo = CicloEscolar::query()->find($alumno->ciclo_escolar_id);
+            if (! $ciclo || $ciclo->cerrado_at) {
+                throw ValidationException::withMessages([
+                    'alumnoReactivarId' => 'El ciclo del alumno está cerrado o no existe. Revisa su continuidad antes de reactivarlo.',
+                ]);
+            }
+
+            $generacion = Generacion::query()->find($alumno->generacion_id);
+            if (! $generacion || ! $generacion->status || (int) $generacion->nivel_id !== (int) $alumno->nivel_id) {
+                throw ValidationException::withMessages([
+                    'alumnoReactivarId' => 'La generación está inactiva o no corresponde al nivel del alumno. Corrige su asignación.',
+                ]);
+            }
+
+            $grupo = Grupo::query()->find($alumno->grupo_id);
+            if (! $grupo || $grupo->estado !== 'activo'
+                || (int) $grupo->ciclo_escolar_id !== (int) $alumno->ciclo_escolar_id
+                || (int) $grupo->nivel_id !== (int) $alumno->nivel_id
+                || (int) $grupo->generacion_id !== (int) $alumno->generacion_id
+                || (int) $grupo->grado_id !== (int) $alumno->grado_id
+                || (int) ($grupo->semestre_id ?? 0) !== (int) ($alumno->semestre_id ?? 0)) {
+                throw ValidationException::withMessages([
+                    'alumnoReactivarId' => 'El grupo ya no está activo o no corresponde a la ubicación académica del alumno. Corrige la asignación antes de reactivar.',
+                ]);
+            }
+
+            $tipo = $alumno->estatus === 'baja_definitiva' ? 'baja definitiva' : 'baja temporal';
+
+            // "activo" es el estatus requerido por visiblesEnListas(); la marca de
+            // reingreso se documenta por separado para no ocultarlo en las listas.
+            return $this->cambiarEstatus(
+                $alumno,
+                'activo',
+                "Reactivación tras {$tipo}. {$motivo}",
+                $usuarioId,
+                $fecha,
+                true,
+            );
+        });
+    }
+
+    public function cambiarEstatus(Inscripcion $alumno, string $estatus, string $motivo, ?int $usuarioId, ?string $fecha = null, bool $reactivacionBaja = false): Inscripcion
     {
         if (!in_array($estatus, self::ESTATUS, true)) {
             throw ValidationException::withMessages(['estatus' => 'El estatus seleccionado no es válido.']);
         }
 
-        return DB::transaction(function () use ($alumno, $estatus, $motivo, $usuarioId, $fecha): Inscripcion {
+        return DB::transaction(function () use ($alumno, $estatus, $motivo, $usuarioId, $fecha, $reactivacionBaja): Inscripcion {
             $alumno = Inscripcion::withTrashed()->lockForUpdate()->findOrFail($alumno->id);
             $antes = $this->snapshot($alumno);
             $esActivo = in_array($estatus, Inscripcion::ESTATUS_ACTIVOS, true);
@@ -306,9 +380,9 @@ class GestionAcademicaService
                 // Egreso, preinscripción u otros estados no activos no son una baja.
                 'fecha_baja' => $esBajaEscolar ? $fechaMovimiento : null,
                 'motivo_baja' => $esBajaEscolar ? $motivo : null,
-                'indicador_reingreso' => $estatus === 'reingreso',
-                'tipo_ultimo_ingreso' => $estatus === 'reingreso' ? 'reingreso' : $alumno->tipo_ultimo_ingreso,
-                'fecha_ultimo_ingreso' => $estatus === 'reingreso' ? $fechaMovimiento : $alumno->fecha_ultimo_ingreso,
+                'indicador_reingreso' => $estatus === 'reingreso' || $reactivacionBaja,
+                'tipo_ultimo_ingreso' => ($estatus === 'reingreso' || $reactivacionBaja) ? 'reingreso' : $alumno->tipo_ultimo_ingreso,
+                'fecha_ultimo_ingreso' => ($estatus === 'reingreso' || $reactivacionBaja) ? $fechaMovimiento : $alumno->fecha_ultimo_ingreso,
             ]);
 
             $alumno = $alumno->fresh();

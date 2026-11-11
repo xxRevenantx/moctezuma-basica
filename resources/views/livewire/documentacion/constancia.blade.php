@@ -61,6 +61,17 @@
         destino.hash = '';
         return destino.href;
     },
+    descargarArchivoWord(url) {
+        if (!url) return;
+        const destino = new URL(url, window.location.origin);
+        if (destino.origin !== window.location.origin || !['http:', 'https:'].includes(destino.protocol)) return;
+        const enlace = document.createElement('a');
+        enlace.href = destino.href;
+        enlace.download = '';
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+    },
     urlDescargaVisor() {
         if (!this.visorUrl) return '#';
         const destino = new URL(this.visorUrl);
@@ -69,6 +80,7 @@
         return destino.href;
     },
 }"
+    x-on:descargar-word-constancia.window="descargarArchivoWord($event.detail?.url)"
     x-on:abrir-visor-constancia.window="mostrarVisorPdf($event)"
     x-on:cerrar-visor-constancia.window="cerrarVisorPdf()"
     x-on:livewire:navigating.window="cerrarVisorPdf()"
@@ -602,7 +614,7 @@
                     </div>
                 @endif
 
-                <div class="flex justify-start">
+                <div class="flex flex-wrap items-center gap-3">
                     <flux:button type="button" variant="primary"
                         x-on:click="prepararVisorPdf(); $wire.descargarConstancia().catch(() => cancelarPreparacionVisor())"
                         wire:loading.attr="disabled" wire:target="descargarConstancia">
@@ -613,6 +625,12 @@
                         <span wire:loading wire:target="descargarConstancia">
                             {{ $modo_descarga === 'alumno' ? 'Generando...' : 'Preparando PDF...' }}
                         </span>
+                    </flux:button>
+                    <flux:button type="button" variant="filled" icon="document-text"
+                        wire:click="descargarConstanciaWord"
+                        wire:loading.attr="disabled" wire:target="descargarConstanciaWord">
+                        <span wire:loading.remove wire:target="descargarConstanciaWord">Descargar Word</span>
+                        <span wire:loading wire:target="descargarConstanciaWord">Preparando Word...</span>
                     </flux:button>
                 </div>
             @endif
@@ -784,7 +802,7 @@
 
                                                         <flux:button size="xs" variant="filled"
                                                             :href="route('misrutas.constancias.word', $constanciaGenerada)"
-                                                            icon="document-text">Word</flux:button>
+                                                            icon="document-text">Descargar Word</flux:button>
 
                                                         @if (($constanciaGenerada->estado_documento ?? 'emitida') !== 'cancelada')
                                                             <flux:button type="button" size="xs"
@@ -875,7 +893,7 @@
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M14 3v5h5 M9 12l1.5 6 1.5-4 1.5 4 1.5-6"/></svg>
                                 <span class="hidden sm:inline">Descargar Word</span><span class="sm:hidden">Word</span>
                             </a>
-                            <button type="button" x-on:click="visorPantallaCompleta = !visorPantallaCompleta
+                            <button type="button" x-on:click="visorPantallaCompleta = !visorPantallaCompleta"
                                 class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#88AC2E] dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                                 :title="visorPantallaCompleta ? 'Restaurar tamaño' : 'Pantalla completa'"
                                 :aria-label="visorPantallaCompleta ? 'Restaurar tamaño' : 'Pantalla completa'">

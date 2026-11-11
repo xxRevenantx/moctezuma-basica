@@ -322,7 +322,10 @@ class Oficio extends Component
         }
 
         $this->alumnos = Inscripcion::query()
-            ->visiblesEnListas()
+            ->where(function ($query): void {
+                $query->visiblesEnListas()
+                    ->orWhereIn('estatus', Inscripcion::ESTATUS_BAJA);
+            })
             ->with([
                 'nivel:id,nombre,cct,director_id',
                 'grado:id,nombre',
@@ -556,6 +559,12 @@ class Oficio extends Component
             'grupo' => $alumno->grupo?->asignacionGrupo?->nombre ?? '',
             'generacion' => $generacion,
             'ciclo' => $alumno->ciclo?->ciclo ?? '',
+            'estatus' => $alumno->estatus ?? 'activo',
+            'estatus_etiqueta' => match ($alumno->estatus) {
+                'baja_temporal' => 'Baja temporal',
+                'baja_definitiva' => 'Baja definitiva',
+                default => 'Activo',
+            },
         ];
     }
 
