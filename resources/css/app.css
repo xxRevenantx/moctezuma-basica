@@ -168,3 +168,44 @@ input:checked + label{
         width: min(18rem, calc(100vw - 2rem)) !important;
     }
 }
+
+
+/* Fichas PRO 3.1: estilos compilados en la hoja global de Vite. */
+#ficha-editor-pro31 { display: block !important; box-sizing: border-box; width: 100% !important; min-width: 0 !important; max-width: 100% !important; flex: 1 1 auto; }
+#ficha-editor-pro31 *, #ficha-editor-pro31 *::before, #ficha-editor-pro31 *::after { box-sizing: border-box; }
+#ficha-editor-pro31 [x-cloak], #ficha-editor-pro31 [hidden] { display: none !important; }
+#ficha-editor-pro31 .ficha-pro31-layout { display: grid !important; grid-template-columns: 260px minmax(0, 1fr) !important; align-items: start; gap: 20px; width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+#ficha-editor-pro31 .ficha-pro31-aside { grid-column: 1; min-width: 0 !important; width: 100% !important; }
+#ficha-editor-pro31 .ficha-pro31-content { grid-column: 2; display: block !important; min-width: 0 !important; width: 100% !important; max-width: 100% !important; flex: 1 1 auto !important; }
+#ficha-editor-pro31 .ficha-pro31-content > section { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+#ficha-editor-pro31 .ficha-pro31-content p { overflow-wrap: normal; overflow-wrap: break-word; white-space: normal; }
+#ficha-editor-pro31 .ficha-pro31-editor-shell { display: block; width: 100%; min-width: 0; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
+#ficha-editor-pro31 .ficha-pro31-toolbar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding: 10px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+#ficha-editor-pro31 .ficha-pro31-toolbar button { min-height: 34px; padding: 5px 10px; border-radius: 6px; border: 1px solid transparent; color: #334155; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+#ficha-editor-pro31 .ficha-pro31-toolbar button:hover:not(:disabled), #ficha-editor-pro31 .ficha-pro31-toolbar button:focus-visible { border-color: #93c5fd; background: #e0f2fe; outline: none; }
+#ficha-editor-pro31 .ficha-pro31-toolbar button:disabled { opacity: .4; cursor: not-allowed; }
+#ficha-editor-pro31 .ficha-pro31-toolbar-divider { height: 22px; width: 1px; background: #cbd5e1; }
+#ficha-editor-pro31 .ficha-pro31-editor-area, #ficha-editor-pro31 .ficha-pro31-respaldo { min-height: 370px; width: 100% !important; min-width: 0; padding: 20px; font-family: Inter, Arial, sans-serif; font-size: 14px; line-height: 1.75; color: #0f172a; background: white; overflow-y: auto; overflow-wrap: anywhere; }
+#ficha-editor-pro31 .ficha-pro31-editor-area:focus-within { outline: 2px solid #7dd3fc; outline-offset: -2px; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap { outline: none; min-height: 325px; white-space: pre-wrap; overflow-wrap: anywhere; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap p { margin: 0 0 0.7em; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap ul { list-style: disc; padding-left: 25px; margin: 0.5em 0; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap ol { list-style: decimal; padding-left: 25px; margin: 0.5em 0; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap h2 { font-size: 19px; font-weight: 750; margin: 0.8em 0 0.4em; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap blockquote { border-left: 3px solid #88ac2e; margin: .75em 0; padding-left: 14px; color: #475569; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap table { border-collapse: collapse; table-layout: fixed; width: 100%; margin: 10px 0; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap td, #ficha-editor-pro31 .ficha-pro31-editor-area .tiptap th { border: 1px solid #94a3b8; padding: 7px; min-width: 45px; vertical-align: top; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap th { background: #eff6ff; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap a { color: #0369a1; text-decoration: underline; }
+#ficha-editor-pro31 .ficha-pro31-editor-area .tiptap .selectedCell { background: #e0f2fe; }
+@media (max-width: 960px) { #ficha-editor-pro31 .ficha-pro31-layout { grid-template-columns: minmax(0, 1fr) !important; } #ficha-editor-pro31 .ficha-pro31-aside, #ficha-editor-pro31 .ficha-pro31-content { grid-column: 1; width: 100% !important; } }
+@media (prefers-reduced-motion: reduce) { #ficha-editor-pro31 * { scroll-behavior: auto !important; } }
+
+/* Defensa adicional ante contenedores externos de ancho intrínseco reducido.
+   La barra lateral Flux ocupa aproximadamente 16rem en escritorio. */
+@media (min-width: 1100px) {
+  #ficha-editor-pro31 { width: calc(100vw - 340px) !important; min-width: min(820px, calc(100vw - 340px)) !important; max-width: calc(100vw - 340px) !important; }
+}
+@media (max-width: 1099px) {
+  #ficha-editor-pro31 { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+}

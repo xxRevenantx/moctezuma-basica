@@ -474,6 +474,11 @@ Route::middleware('admin')->prefix('/generales/bachillerato/promedio-anual')->gr
 
 
 // FICHAS DESCRIPTIVAS PREESCOLAR
+// Editor integral de fichas en una pantalla dedicada, sin modal sobre el listado.
+Route::get('/nivel/preescolar/fichas/{inscripcion}/editar', \App\Livewire\Accion\FichaEditor::class)
+    ->whereNumber('inscripcion')
+    ->name('misrutas.fichas.editor');
+
 Route::get('/fichas/preescolar/excel', [FichaController::class, 'excel'])
     ->name('misrutas.fichas.excel');
 

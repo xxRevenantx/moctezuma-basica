@@ -24,6 +24,9 @@ class EnsureRoleRouteScope
         'profesor.horario.pdf',
         'misrutas.fichas.grupo.pdf',
         'misrutas.fichas.alumno.pdf',
+        'misrutas.fichas.alumno.word',
+        'misrutas.fichas.grupo.word',
+        'misrutas.fichas.editor',
     ];
 
     public function handle(Request $request, Closure $next): Response

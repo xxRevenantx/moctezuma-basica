@@ -1,3 +1,4 @@
+import './ficha-editor-pro31.js';
 import './foto-visor-global.js';
 
 

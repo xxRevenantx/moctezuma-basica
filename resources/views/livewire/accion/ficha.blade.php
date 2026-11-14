@@ -1,7 +1,9 @@
 @php
     $esProfesor = auth()->user()?->isProfessor();
 @endphp
-<div class="space-y-5" x-data="{ vistaPrevia: false, urlPrevia: '', copiadoInformeGrupo: false }" @keydown.escape.window="vistaPrevia=false">
+<div class="space-y-5" x-data="{ vistaPrevia: false, urlPrevia: '', copiadoInformeGrupo: false }"
+     @keydown.escape.window="vistaPrevia = false"
+     @ficha-vista-pdf-lista.window="urlPrevia=$event.detail.url;vistaPrevia=true">
     {{-- Encabezado institucional y selector independiente de evaluación --}}
     <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div class="relative overflow-hidden bg-gradient-to-r from-[#006492] via-[#087eaf] to-[#88ac2e] p-6 text-white sm:p-8">
@@ -11,7 +13,7 @@
                     <div class="mb-2 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-widest">
                         <flux:icon.academic-cap class="size-4" /> Preescolar · Gestión académica
                     </div>
-                    <h1 class="text-2xl font-black tracking-tight sm:text-3xl">Fichas Descriptivas <span class="text-lime-200">PRO 2.0</span></h1>
+                    <h1 class="text-2xl font-black tracking-tight sm:text-3xl">Fichas Descriptivas <span class="text-lime-200">PRO 3.0</span></h1>
                     <p class="mt-2 max-w-2xl text-sm text-white/90">Captura pedagógica, revisión académica y documentos institucionales por estudiante y periodo.</p>
                 </div>
                 <div class="rounded-2xl border border-white/20 bg-white/10 p-3 text-center backdrop-blur-sm">
@@ -107,7 +109,7 @@
                 <p class="text-xs text-slate-500 dark:text-neutral-400">Previsualiza el PDF, imprime o descarga Word editable. Respeta los filtros y el periodo.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <flux:button type="button" icon="eye" variant="outline" x-on:click="urlPrevia=@js($this->urlPdfGrupo);vistaPrevia=true">Vista previa del grupo</flux:button>
+                <flux:button type="button" icon="eye" variant="outline" x-on:click="urlPrevia = $el.dataset.pdfUrl; vistaPrevia = true" data-pdf-url="{{ $this->urlPdfGrupo }}">Vista previa del grupo</flux:button>
                 <flux:button href="{{ $this->urlPdfGrupo }}" target="_blank" icon="document-arrow-down" variant="primary">PDF grupo</flux:button>
                 <flux:button href="{{ $this->urlWordGrupo }}" target="_blank" icon="document-text" variant="outline">Word grupo</flux:button>
                 @unless ($esProfesor)
@@ -516,8 +518,8 @@
                         </div>
                         <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-neutral-800"><div class="h-full rounded-full bg-gradient-to-r from-[#006492] to-[#88ac2e]" style="width: {{ $porcentaje }}%"></div></div>
                         <div class="mt-4 flex flex-wrap gap-2">
-                            <flux:button type="button" wire:click="abrirModal({{ $alumno->id }})" wire:loading.attr="disabled" wire:target="abrirModal" size="sm" variant="primary" icon="pencil-square">{{ $estado === 'finalizada' ? 'Consultar' : 'Editar' }}</flux:button>
-                            <flux:button type="button" size="sm" variant="outline" icon="eye" x-on:click="urlPrevia=@js($this->urlPdfAlumno($alumno->id));vistaPrevia=true">PDF</flux:button>
+                            <flux:button href="{{ $this->urlEditorAlumno($alumno->id) }}" size="sm" variant="primary" icon="pencil-square">{{ $estado === 'finalizada' ? 'Consultar' : 'Editar' }}</flux:button>
+                            <flux:button type="button" size="sm" variant="outline" icon="eye" x-on:click="urlPrevia = $el.dataset.pdfUrl; vistaPrevia = true" data-pdf-url="{{ $this->urlPdfAlumno($alumno->id) }}">PDF</flux:button>
                             <flux:button href="{{ $this->urlWordAlumno($alumno->id) }}" target="_blank" size="sm" variant="ghost" icon="document-text">Word</flux:button>
                         </div>
                         @include('livewire.accion.partials.ficha-acciones-estado', ['estadoFicha' => $estado, 'cantidadCapturada' => $completados])
@@ -553,8 +555,8 @@
                         </td>
                         <td class="px-4 py-4"><span @class(['inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold', 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' => $estado === 'finalizada', 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' => $estado === 'en_revision', 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' => $estado === 'borrador'])>{{ $estado === 'finalizada' ? 'Finalizada' : ($estado === 'en_revision' ? 'En revisión' : 'Borrador') }}</span></td>
                         <td class="min-w-[300px] px-4 py-4"><div class="flex flex-wrap items-center gap-2">
-                            <flux:button type="button" size="sm" variant="primary" icon="pencil-square" wire:click="abrirModal({{ $alumno->id }})" wire:loading.attr="disabled" wire:target="abrirModal">{{ $estado === 'finalizada' ? 'Ver ficha' : 'Editar' }}</flux:button>
-                            <flux:button type="button" size="sm" variant="outline" icon="eye" x-on:click="urlPrevia=@js($this->urlPdfAlumno($alumno->id));vistaPrevia=true">PDF</flux:button>
+                            <flux:button href="{{ $this->urlEditorAlumno($alumno->id) }}" size="sm" variant="primary" icon="pencil-square">{{ $estado === 'finalizada' ? 'Ver ficha' : 'Editar' }}</flux:button>
+                            <flux:button type="button" size="sm" variant="outline" icon="eye" x-on:click="urlPrevia = $el.dataset.pdfUrl; vistaPrevia = true" data-pdf-url="{{ $this->urlPdfAlumno($alumno->id) }}">PDF</flux:button>
                             <flux:button href="{{ $this->urlWordAlumno($alumno->id) }}" size="sm" target="_blank" variant="ghost" icon="document-text">Word</flux:button>
                             @include('livewire.accion.partials.ficha-acciones-estado', ['estadoFicha' => $estado, 'cantidadCapturada' => $completados])
                         </div></td>
@@ -568,105 +570,6 @@
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 dark:border-neutral-800"><p class="text-xs font-semibold text-slate-500">{{ $alumnos->total() }} estudiantes</p>{{ $alumnos->links() }}</div>
     </section>
 
-    {{-- Contenedor ESTABLE: el root del modal nunca se crea o destruye durante un morph Livewire.
-         Esto evita que un update del editor remonte o borre el panel de alumnos. --}}
-    <div wire:key="ficha-pro-modal-shell" x-cloak x-show="$wire.modalAbierto"
-         x-transition.opacity.duration.150ms
-         style="display: none;"
-         class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-2 backdrop-blur-sm sm:p-4"
-         role="dialog" aria-modal="true" aria-label="Editor de ficha descriptiva"
-         x-on:click.self="window.cerrarFichaSeguro?.()">
-    @if ($modalAbierto && $this->alumnoModal)
-        @php
-            $resumenModal = \App\Models\FichaDescriptiva::query()->where('inscripcion_id', $inscripcion_id)->where('ciclo_escolar_id', $ciclo_escolar_id)->where('periodo', $periodo)->pluck('descripcion', 'campo');
-            $estadoModal = $tablasControlListas ? (\App\Models\FichaEstado::query()->where('inscripcion_id', $inscripcion_id)->where('ciclo_escolar_id', $ciclo_escolar_id)->where('periodo', $periodo)->value('estado') ?? 'borrador') : 'borrador';
-        @endphp
-        <div wire:key="ficha-editor-content-{{ $inscripcion_id }}" class="flex max-h-[96vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-neutral-900">
-                <div class="flex items-center justify-between gap-4 bg-gradient-to-r from-[#006492] to-[#0078a6] px-5 py-4 text-white">
-                    <div class="min-w-0"><p class="text-[11px] font-black uppercase tracking-widest text-white/75">Editor integral · {{ $this->periodoCorto($periodo) }}</p>
-                        <h2 class="truncate text-lg font-black">{{ $this->alumnoNombre($this->alumnoModal) }}</h2>
-                        <p class="text-xs text-white/80">{{ $this->alumnoModal?->grado?->nombre }} · Captura formativa institucional</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="hidden rounded-full bg-white/15 px-3 py-1 text-xs font-semibold sm:block">{{ $estadoModal === 'finalizada' ? 'Ficha finalizada' : 'Borrador editable' }}</span>
-                        <flux:button type="button" variant="ghost" size="sm" icon="x-mark" x-on:click="window.cerrarFichaSeguro?.()" class="text-white">Cerrar</flux:button>
-                    </div>
-                </div>
-                <div class="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[260px_minmax(0,1fr)]">
-                    <aside class="border-b border-slate-200 bg-slate-50 p-4 dark:border-neutral-800 dark:bg-neutral-950 lg:border-b-0 lg:border-r">
-                        <p class="mb-3 px-2 text-xs font-black uppercase tracking-wide text-slate-500">Campos formativos</p>
-                        <div class="flex flex-row gap-1 overflow-x-auto lg:flex-col">
-                            @foreach ($campos as $clave => $informacion)
-                                @php
-                                    $capturado = filled(trim(strip_tags((string) ($resumenModal[$clave] ?? ''))));
-                                @endphp
-                                <button type="button" wire:key="nav-{{ $clave }}" x-on:click="window.cambiarCampoFicha?.(@js($clave))" @class(['flex shrink-0 items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-semibold transition lg:w-full', 'bg-[#006492] text-white shadow-sm' => $campo === $clave, 'text-slate-600 hover:bg-slate-200 dark:text-neutral-300 dark:hover:bg-neutral-800' => $campo !== $clave])>
-                                    <span class="grid size-6 shrink-0 place-items-center rounded-full {{ $capturado ? 'bg-lime-100 text-lime-700' : 'bg-white/15 text-current' }}">{{ $capturado ? '✓' : $loop->iteration }}</span>
-                                    <span class="max-w-40">{{ $informacion['label'] }}</span>
-                                </button>
-                            @endforeach
-                        </div>
-                        <div class="mt-5 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
-                            <p class="font-bold text-slate-700 dark:text-neutral-100">Seguimiento seguro</p>
-                            <p class="mt-1">Se guarda automáticamente después de dejar de escribir. También puedes guardar manualmente.</p>
-                        </div>
-                        <div class="mt-4"><p class="text-xs font-bold text-slate-600 dark:text-neutral-300">Últimos movimientos</p>
-                            @forelse ($this->historialModal as $movimiento)
-                                <p class="mt-2 border-b border-slate-100 pb-2 text-[11px] text-slate-500 dark:border-neutral-800">{{ ucfirst($movimiento->accion) }} · {{ $movimiento->campo ?? 'Ficha' }} · {{ $movimiento->created_at?->format('d/m H:i') }}</p>
-                            @empty
-                                <p class="mt-2 text-xs text-slate-400">Aún no hay movimientos registrados.</p>
-                            @endforelse
-                        </div>
-                    </aside>
-                    <div class="min-w-0 space-y-4 p-4 sm:p-6">
-                        <div class="flex flex-wrap items-start justify-between gap-3"><div>
-                            <h3 class="text-xl font-black text-slate-900 dark:text-white">{{ $campos[$campo]['label'] ?? 'Descripción' }}</h3>
-                            <p class="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-neutral-400">{{ $campos[$campo]['descripcion'] ?? '' }}</p>
-                        </div><span @class(['rounded-full px-3 py-1 text-xs font-bold', 'bg-emerald-100 text-emerald-700' => $estadoGuardado === 'guardado', 'bg-amber-100 text-amber-700' => $estadoGuardado !== 'guardado'])>{{ $estadoGuardado === 'guardado' ? 'Guardado' : 'Cambios pendientes' }}</span></div>
-                        @if ($estadoModal === 'finalizada')
-                            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Esta ficha está finalizada. La administración debe reabrirla antes de editar.</div>
-                        @endif
-                        <flux:field>
-                            <flux:label>Descripción pedagógica</flux:label>
-                            <div wire:ignore><textarea id="editor_ficha_descriptiva" data-solo-lectura="{{ $estadoModal === 'finalizada' ? '1' : '0' }}" {{ $estadoModal === 'finalizada' ? 'readonly' : '' }}>{{ $descripcion }}</textarea></div>
-                            <div class="mt-2 flex items-center justify-between text-xs text-slate-500"><span>Máximo 5000 caracteres HTML · Guarda por apartado</span><flux:error name="descripcion" /></div>
-                        </flux:field>
-                        @if (!$esProfesor && $estadoModal !== 'finalizada')
-                            <details class="group rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/30 dark:bg-emerald-500/10" open>
-                                <summary class="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-extrabold text-emerald-800 dark:text-emerald-200"><span class="flex items-center gap-2"><flux:icon.sparkles class="size-5" /> Asistente pedagógico IA · Groq</span><flux:icon.chevron-down class="size-4 group-open:rotate-180" /></summary>
-                                <div class="space-y-3 border-t border-emerald-200 p-4 dark:border-emerald-500/30">
-                                    <p class="text-xs text-slate-600 dark:text-neutral-300">{{ $groq_mensaje }} · Para utilizar Groq, verifica la conexión con el botón correspondiente. Las propuestas requieren aprobación manual y no deben incluir datos sensibles.</p>
-                                    <flux:textarea wire:model="observaciones_ia" rows="3" label="Observaciones o ideas para la IA" placeholder="Describe únicamente hechos observables y necesidades pedagógicas..." />
-                                    <div class="flex flex-wrap gap-2">
-                                        <flux:button type="button" variant="primary" icon="sparkles" x-on:click="window.generarDescripcionFichaIA?.()" wire:loading.attr="disabled" wire:target="generarDescripcionIA" :disabled="!($groq_disponible && $groq_modelo_disponible)">Generar sugerencia</flux:button>
-                                        <flux:button type="button" variant="ghost" icon="arrow-path" wire:click="verificarGroq" size="sm">Verificar conexión</flux:button>
-                                    </div>
-                                    <flux:error name="observaciones_ia" />
-                                    @if ($propuesta_ia !== '')
-                                        <div class="grid gap-3 lg:grid-cols-2">
-                                            <div class="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-neutral-700 dark:bg-neutral-900"><p class="mb-2 font-black">Texto original</p><div class="prose prose-sm max-w-none dark:prose-invert">{!! app(\App\Services\HtmlSanitizerService::class)->sanitize($texto_original_ia) !!}</div></div>
-                                            <div class="rounded-xl border border-emerald-200 bg-white p-3 text-xs dark:bg-neutral-900"><p class="mb-2 font-black text-emerald-700">Propuesta de IA</p><div class="prose prose-sm max-w-none dark:prose-invert">{!! app(\App\Services\HtmlSanitizerService::class)->sanitize($propuesta_ia) !!}</div></div>
-                                        </div>
-                                        <div class="flex gap-2"><flux:button type="button" wire:click="aceptarSugerenciaIA" variant="primary" icon="check">Aceptar propuesta</flux:button><flux:button type="button" wire:click="descartarSugerenciaIA" variant="outline">Descartar</flux:button></div>
-                                    @endif
-                                </div>
-                            </details>
-                        @endif
-                        <div class="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white/95 py-4 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/95">
-                            <div class="text-xs font-semibold text-slate-500"><span wire:loading wire:target="guardarBorrador,guardar,generarDescripcionIA">Procesando cambios…</span><span wire:loading.remove wire:target="guardarBorrador,guardar,generarDescripcionIA">{{ $estadoModal === 'finalizada' ? 'Consulta de solo lectura' : 'Autoguardado activo' }}</span></div>
-                            <div class="flex flex-wrap gap-2">
-                                <flux:button type="button" variant="outline" icon="eye" x-on:click="urlPrevia=@js($this->urlPdfAlumno($inscripcion_id));vistaPrevia=true">Vista PDF</flux:button>
-                                @if ($estadoModal !== 'finalizada')
-                                    <flux:button type="button" x-on:click="window.guardarFichaDesdeEditor?.()" variant="primary" wire:loading.attr="disabled" wire:target="guardar,generarDescripcionIA" icon="check">Guardar y cerrar</flux:button>
-                                @endif
-                                <flux:button type="button" x-on:click="window.cerrarFichaSeguro?.()" variant="ghost">Cerrar</flux:button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-        </div>
-    @endif
-    </div>
     {{-- Vista previa en el sistema: iframe sólo se monta cuando el usuario la solicita. --}}
     <div x-cloak x-show="vistaPrevia" class="fixed inset-0 z-[90] grid place-items-center bg-slate-950/80 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Vista previa PDF">
         <div class="flex h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-neutral-900">
@@ -677,128 +580,6 @@
         </div>
     </div>
 
-    @script
-    <script>
-    // Este bloque se ejecuta cuando Livewire monta el componente; no espera un evento
-    // livewire:init que ya pudo haberse emitido antes de cargar esta vista.
-        let editor = null;
-        let debounce = null;
-        let guardando = null;
-        let actualizandoDesdeServidor = false;
 
-        const getTextarea = () => document.getElementById('editor_ficha_descriptiva');
-        const getContenido = () => editor ? editor.getContent() : (getTextarea()?.value ?? '');
-        const limpiarTemporizador = () => { if (debounce) clearTimeout(debounce); debounce = null; };
-        const liberarEditor = () => {
-            limpiarTemporizador();
-            if (window.tinymce && tinymce.get('editor_ficha_descriptiva')) {
-                tinymce.get('editor_ficha_descriptiva').remove();
-            }
-            editor = null;
-        };
 
-        const guardarSiPendiente = async () => {
-            limpiarTemporizador();
-            if (!getTextarea() || getTextarea().dataset.soloLectura === '1') return true;
-            if (guardando) await guardando;
-            if ($wire.get('estadoGuardado') === 'guardado') return true;
-            guardando = (async () => {
-                await $wire.set('descripcion', getContenido(), false);
-                await $wire.call('guardarBorrador');
-            })();
-            try { await guardando; } catch (e) { console.error('Error al guardar la ficha', e); }
-            finally { guardando = null; }
-            return $wire.get('estadoGuardado') === 'guardado';
-        };
-
-        const cambioLocal = () => {
-            if (actualizandoDesdeServidor || !getTextarea() || getTextarea().dataset.soloLectura === '1') return;
-            $wire.set('descripcion', getContenido(), false);
-            $wire.set('estadoGuardado', 'pendiente', false);
-            limpiarTemporizador();
-            debounce = setTimeout(() => { guardarSiPendiente(); }, 1800);
-        };
-
-        const iniciarEditor = async (contenido) => {
-            liberarEditor();
-            await new Promise((resolve) => requestAnimationFrame(resolve));
-            for (let i = 0; i < 25 && !getTextarea(); i++) {
-                await new Promise((r) => setTimeout(r, 80));
-            }
-            const area = getTextarea();
-            if (!area) {
-                console.warn('[Fichas PRO] El editor no está aún en el DOM; conservamos el modal abierto.');
-                return;
-            }
-            area.value = contenido ?? '';
-            area.classList.add('block', 'w-full', 'min-h-[300px]', 'rounded-xl', 'border', 'border-slate-200', 'p-3', 'text-sm', 'dark:bg-neutral-900', 'dark:text-white');
-            area.oninput = cambioLocal;
-            area.onblur = () => guardarSiPendiente();
-            // La edición sigue disponible como textarea si TinyMCE no está instalado.
-            if (!window.tinymce) return;
-            try {
-                await tinymce.init({
-                    target: area, height: 340, readonly: area.dataset.soloLectura === '1', menubar: false, branding: false, promotion: false,
-                    browser_spellcheck: true, language: 'es',
-                    plugins: 'lists link table wordcount code searchreplace fullscreen',
-                    toolbar: 'undo redo | bold italic underline | bullist numlist | alignleft aligncenter alignright | link table | fullscreen',
-                    content_style: 'body {font-family:Arial,sans-serif;font-size:14px;line-height:1.7;padding:12px}',
-                    setup: (instancia) => {
-                        instancia.on('init', () => {
-                            editor = instancia;
-                            actualizandoDesdeServidor = true;
-                            instancia.setContent(contenido ?? '');
-                            actualizandoDesdeServidor = false;
-                        });
-                        instancia.on('input change undo redo', cambioLocal);
-                        instancia.on('blur', () => guardarSiPendiente());
-                    }
-                });
-            } catch (e) {
-                console.warn('No se pudo inicializar TinyMCE. Se mantiene el editor básico.', e);
-            }
-        };
-
-        window.cambiarCampoFicha = async (clave) => {
-            if (!(await guardarSiPendiente())) {
-                alert('No se pudieron guardar los cambios. Revisa la validación antes de cambiar de campo.');
-                return;
-            }
-            await $wire.call('seleccionarCampo', clave);
-        };
-        window.guardarFichaDesdeEditor = async () => {
-            if (!(await guardarSiPendiente())) {
-                alert('Hay cambios sin guardar. Revisa los errores del formulario.');
-                return;
-            }
-            await $wire.call('cerrarModal');
-        };
-        window.cerrarFichaSeguro = async () => {
-            if (!(await guardarSiPendiente())) {
-                alert('No se puede cerrar porque los cambios no fueron guardados. Corrige los errores o copia el texto antes de salir.');
-                return;
-            }
-            await $wire.call('cerrarModal');
-        };
-        window.generarDescripcionFichaIA = async () => {
-            limpiarTemporizador();
-            await $wire.set('descripcion', getContenido(), false);
-            await $wire.call('generarDescripcionIA');
-        };
-        window.addEventListener('abrir-modal-ficha', (event) => iniciarEditor(event.detail.contenido ?? ''));
-        window.addEventListener('actualizar-editor-ficha', async (event) => {
-            const contenido = event.detail.contenido ?? '';
-            actualizandoDesdeServidor = true;
-            if (editor) editor.setContent(contenido);
-            else if (getTextarea()) getTextarea().value = contenido;
-            actualizandoDesdeServidor = false;
-            if ($wire.get('estadoGuardado') === 'pendiente') {
-                limpiarTemporizador();
-                debounce = setTimeout(() => guardarSiPendiente(), 1200);
-            }
-        });
-        window.addEventListener('cerrar-modal-ficha', liberarEditor);
-        document.addEventListener('livewire:navigating', liberarEditor);
-    </script>
-    @endscript
 </div>

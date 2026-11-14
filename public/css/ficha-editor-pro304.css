@@ -1,0 +1,10 @@
+/* Fichas Preescolar PRO 3.0.4: CSS estático; Livewire nunca lo remueve al morph. */
+.ficha-pro3-root { display: block !important; box-sizing: border-box; width: 100% !important; max-width: 100% !important; min-width: 0 !important; flex: 1 1 auto; align-self: stretch; }
+.ficha-pro3-root *, .ficha-pro3-root *::before, .ficha-pro3-root *::after { box-sizing: border-box; }
+.ficha-pro3-root [x-cloak], .ficha-pro3-root [hidden] { display: none !important; }
+.ficha-pro3-root .ficha-pro3-layout { display: grid !important; grid-template-columns: 260px minmax(0,1fr); align-items: start; column-gap: 1.25rem; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+.ficha-pro3-root .ficha-pro3-aside { grid-column: 1; width: 100% !important; min-width: 0 !important; max-width: none !important; }
+.ficha-pro3-root .ficha-pro3-content { grid-column: 2; width: 100% !important; max-width: 100% !important; min-width: 0 !important; flex: none !important; }
+.ficha-pro3-root .ficha-pro3-content > section, .ficha-pro3-root .ficha-pro3-content .tox-tinymce, .ficha-pro3-root .ficha-pro3-content .tox-editor-container { width: 100% !important; max-width: 100%; min-width: 0; }
+.ficha-pro3-root .ficha-pro3-content p { overflow-wrap: break-word; }
+@media (max-width: 1023px) { .ficha-pro3-root .ficha-pro3-layout { grid-template-columns: minmax(0,1fr); row-gap: 1rem; } .ficha-pro3-root .ficha-pro3-aside, .ficha-pro3-root .ficha-pro3-content { grid-column: 1; width: 100% !important; } }

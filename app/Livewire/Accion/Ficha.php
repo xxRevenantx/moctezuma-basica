@@ -1254,6 +1254,24 @@ class Ficha extends Component
         return route('misrutas.fichas.grupo.word', $this->parametrosDescarga());
     }
 
+    /** Navegación completa: el editor no comparte ciclo de vida con la tabla. */
+    public function urlEditorAlumno(int $inscripcionId): string
+    {
+        return route('misrutas.fichas.editor', array_filter([
+            'inscripcion' => $inscripcionId,
+            'ciclo_escolar_id' => $this->ciclo_escolar_id,
+            'periodo' => $this->periodo,
+            'generacion_id' => $this->generacion_id,
+            'grado_id' => $this->grado_id,
+            'grupo_id' => $this->grupo_id,
+            'busqueda' => $this->busqueda,
+            'fecha_lugar' => $this->fecha_lugar,
+            'page' => $this->getPage() > 1 ? $this->getPage() : null,
+            'estadoFiltro' => $this->estadoFiltro !== 'todos' ? $this->estadoFiltro : null,
+            'vistaAlumnos' => $this->vistaAlumnos !== 'tabla' ? $this->vistaAlumnos : null,
+        ], fn ($value) => $value !== null && $value !== ''));
+    }
+
     public function urlWordAlumno(int $inscripcionId): string
     {
         return route('misrutas.fichas.alumno.word', array_merge($this->parametrosDescarga(), [

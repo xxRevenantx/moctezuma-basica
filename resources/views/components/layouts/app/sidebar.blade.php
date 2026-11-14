@@ -4,7 +4,11 @@
 <head>
     @include('partials.head')
 
-    <x-head.tinymce-config />
+    {{-- Tiny Cloud se conserva solo para las pantallas antiguas que aún lo usan. --}}
+    @unless (request()->routeIs('misrutas.fichas.editor'))
+        <x-head.tinymce-config />
+    @endunless
+
 </head>
 
 <body class="min-h-screen bg-white dark:bg-zinc-800">
