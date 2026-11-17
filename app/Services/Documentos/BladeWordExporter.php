@@ -52,6 +52,43 @@ class BladeWordExporter
         ])->deleteFileAfterSend(true);
     }
 
+    /**
+     * Un único Word editable con los documentos de cada alumno, separados por
+     * saltos de página. Utiliza la misma conversión que la descarga individual.
+     *
+     * @param list<array{vista:string, datos:array}> $documentos
+     */
+    public function descargarLote(array $documentos, string $nombre, string $orientacion = 'portrait'): BinaryFileResponse
+    {
+        if ($documentos === []) {
+            throw new \InvalidArgumentException('No hay documentos para exportar.');
+        }
+
+        $paginas = [];
+        foreach ($documentos as $documento) {
+            $html = view($documento['vista'], $documento['datos'])->render();
+            array_push($paginas, ...$this->paginasEditables($html));
+        }
+
+        $temporal = storage_path('app/temp/documentos-word');
+        File::ensureDirectoryExists($temporal, 0775, true);
+        Settings::setTempDir($temporal);
+        $archivo = $temporal . DIRECTORY_SEPARATOR . Str::uuid() . '.docx';
+        $this->crearDocumento($paginas, $archivo, $orientacion);
+
+        $nombre = basename(str_replace('\\', '/', $nombre));
+        $nombre = preg_replace('/[^\pL\pN._ -]/u', '_', $nombre) ?: 'documentos.docx';
+        if (! str_ends_with(strtolower($nombre), '.docx')) {
+            $nombre .= '.docx';
+        }
+
+        return response()->download($archivo, $nombre, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ])->deleteFileAfterSend(true);
+    }
+
     private function crearDocumento(array $paginas, string $ruta, string $orientacion): void
     {
         $word = new PhpWord();

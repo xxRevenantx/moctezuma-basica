@@ -22,6 +22,7 @@ use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
+use App\Services\InformeAcademicoIaExportService;
 use App\Services\CalificacionCorreccionService;
 use App\Services\CicloNivelGateService;
 use App\Services\HistorialCalificacionesGeneracionService;
@@ -117,6 +118,7 @@ class Calificacion extends Component
     public string $tipoDiagnosticoIa = 'pedagogico';
     public array $diagnosticoIa = [];
     public ?string $diagnosticoIaGeneradoEn = null;
+    public array $metadatosDiagnosticoIa = [];
 
     public $boleta_inscripcion_id = '';
     public $reconocimiento_inscripcion_id = '';

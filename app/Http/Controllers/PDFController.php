@@ -3251,6 +3251,11 @@ class PDFController extends Controller
             '_' . str_replace(' ', '_', mb_strtoupper($nombrePeriodo)) .
             '.pdf';
 
+        // Modo interno, no expuesto por parámetros HTTP: reutiliza el mismo cálculo oficial.
+        if ($request->attributes->get('documentos_periodo_masivos_datos') === true) {
+            return ['vista' => 'pdf.reconocimiento_pdf', 'datos' => $data, 'orientacion' => 'landscape'];
+        }
+
         if ($request->routeIs('misrutas.reconocimiento.calificaciones.word')) {
             return app(BladeWordExporter::class)->descargar('pdf.reconocimiento_pdf', $data, str_replace('.pdf', '.docx', $nombreArchivo), 'landscape');
         }
@@ -4820,6 +4825,11 @@ class PDFController extends Controller
             str_replace(' ', '_', mb_strtoupper($nombreAlumno ?: 'ALUMNO')) .
             '_' . str_replace(' ', '_', mb_strtoupper($nombrePeriodo)) .
             '.pdf';
+
+        // Modo interno, no expuesto por parámetros HTTP: reutiliza los mismos datos y reglas.
+        if ($request->attributes->get('documentos_periodo_masivos_datos') === true) {
+            return ['vista' => 'pdf.boleta_calificaciones_pdf', 'datos' => $datosDocumento, 'orientacion' => 'portrait'];
+        }
 
         if ($request->routeIs('misrutas.boleta.calificaciones.word')) {
             return app(BladeWordExporter::class)->descargar('pdf.boleta_calificaciones_pdf', $datosDocumento, str_replace('.pdf', '.docx', $nombreArchivo), 'portrait');

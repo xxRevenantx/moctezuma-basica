@@ -1,4 +1,4 @@
-@php($esProfesor = auth()->user()?->isProfessor())
+@php($esProfesor = (bool) auth()->user()?->isProfessor())
 
 <div x-data="{
     insIds: @js(collect($inscripcionesTabla)->pluck('inscripcion_id')->values()->all()),
@@ -13,6 +13,8 @@
     herramientasAcademicasKey: 'calificaciones_herramientas_{{ $slug_nivel }}',
     herramientasAcademicasAbiertas: @js(!empty($resumenImportacion) || !empty($diagnosticoIa)),
     forzarHerramientasAcademicasAbiertas: @js(!empty($resumenImportacion) || !empty($diagnosticoIa)),
+    subiendoPlantilla: false,
+    porcentajePlantilla: 0,
 
     iniciarHerramientasAcademicas() {
         if (this.forzarHerramientasAcademicasAbiertas) {
@@ -55,8 +57,6 @@
         this.$watch('$wire.filtro_registros', () => this.guardarFiltros());
         this.$watch('$wire.filtro_estatus_historico', () => this.guardarFiltros());
         this.$watch('$wire.orden_promedio', () => this.guardarFiltros());
-        this.$watch('$wire.boleta_inscripcion_id', () => this.guardarFiltros());
-        this.$watch('$wire.reconocimiento_inscripcion_id', () => this.guardarFiltros());
     },
 
     async restaurarFiltros() {
@@ -168,14 +168,6 @@
             await this.$wire.set('orden_promedio', filtros.orden_promedio);
         }
 
-        if (filtros.boleta_inscripcion_id) {
-            await this.$wire.set('boleta_inscripcion_id', filtros.boleta_inscripcion_id);
-        }
-
-        if (filtros.reconocimiento_inscripcion_id) {
-            await this.$wire.set('reconocimiento_inscripcion_id', filtros.reconocimiento_inscripcion_id);
-        }
-
         this.restaurandoFiltros = false;
 
         // Se recargan las gráficas después de restaurar los filtros guardados.
@@ -206,8 +198,6 @@
             filtro_registros: this.$wire.filtro_registros || 'todos',
             filtro_estatus_historico: this.$wire.filtro_estatus_historico || '',
             orden_promedio: this.$wire.orden_promedio || '',
-            boleta_inscripcion_id: this.$wire.boleta_inscripcion_id || '',
-            reconocimiento_inscripcion_id: this.$wire.reconocimiento_inscripcion_id || '',
         };
 
         localStorage.setItem(this.storageKey, JSON.stringify(filtros));
@@ -317,6 +307,14 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
             <a href="{{ route('misrutas.calificaciones-docente', ['slug_nivel' => $slug_nivel]) }}" wire:navigate class="rounded-xl bg-[#006492] px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-800">Abrir módulo →</a>
         </div>
     @endif
+
+    {{--
+        Indicadores independientes por destino. Solo se muestran mientras Livewire
+        procesa el modelo o metodo indicado; no hay overlay global bloqueante.
+    --}}
+    {{-- Declaraciones inline para evitar conflictos en el compilador Blade. --}}
+    @php($objetivosContextoDocumentos = 'ciclo_escolar_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,periodo_basica_id,limpiarFiltros,seleccionarModoConsulta')
+    @php($objetivosTabla = $objetivosContextoDocumentos . ',busqueda,filtro_estado,filtro_registros,filtro_estatus_historico,orden_promedio,importarPlantillaCalificaciones')
 
     {{-- Navegación entre captura vigente e historial --}}
     @unless ($this->esProfesorAutenticado)
@@ -688,69 +686,29 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
         <button type="button" x-on:click="alternarHerramientasAcademicas()"
             x-bind:aria-expanded="herramientasAcademicasAbiertas"
             aria-controls="herramientas-academicas-{{ $slug_nivel }}"
-            class="group flex w-full items-center justify-between gap-4 px-5 py-5 text-left transition hover:bg-slate-50 dark:hover:bg-neutral-800/60 sm:px-6">
+            class="group flex w-full flex-col gap-4 px-5 py-5 text-left transition hover:bg-slate-50/80 dark:hover:bg-neutral-800/60 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex min-w-0 items-start gap-4">
-                <span
-                    class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 via-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/20">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-md shadow-slate-300/50 dark:bg-sky-700 dark:shadow-none">
                     <flux:icon.rectangle-stack class="h-6 w-6" />
                 </span>
-
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <span
-                            class="inline-flex rounded-full bg-sky-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-sky-700 ring-1 ring-sky-100 dark:bg-sky-950/30 dark:text-sky-300 dark:ring-sky-900/50">
-                            Herramientas complementarias
-                        </span>
-
+                        <span class="text-[11px] font-black uppercase tracking-[.15em] text-sky-700 dark:text-sky-300">Panel de herramientas</span>
                         @if (!empty($resumenImportacion))
-                            <span
-                                class="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/50">
-                                Importación procesada
-                            </span>
+                            <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Excel procesado</span>
                         @endif
-
                         @if (!empty($diagnosticoIa))
-                            <span
-                                class="inline-flex rounded-full bg-violet-50 px-3 py-1 text-[11px] font-black text-violet-700 ring-1 ring-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:ring-violet-900/50">
-                                Informe IA disponible
-                            </span>
+                            <span class="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">Informe IA listo</span>
                         @endif
                     </div>
-
-                    <h3 class="mt-2 text-xl font-black tracking-tight text-neutral-900 dark:text-white sm:text-2xl">
-                        Importación y análisis académico
-                    </h3>
-
-                    <p class="mt-1 max-w-4xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                        Plantilla Excel, indicadores del grupo, diagnóstico automático e informe académico con IA en un
-                        solo apartado.
-                    </p>
-
-                    <div class="mt-3 hidden flex-wrap gap-2 sm:flex">
-                        <span
-                            class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">Excel</span>
-                        <span
-                            class="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-950/30 dark:text-sky-300">Indicadores</span>
-                        <span
-                            class="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">Diagnóstico</span>
-                        <span
-                            class="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">GroqCloud</span>
-                    </div>
+                    <h3 class="mt-1 text-xl font-black tracking-tight text-neutral-900 dark:text-white sm:text-2xl">Importación y análisis académico</h3>
+                    <p class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">Gestiona calificaciones masivas, consulta indicadores y genera un diagnóstico del grupo desde un mismo lugar.</p>
                 </div>
             </div>
-
-            <div class="flex shrink-0 items-center gap-3">
-                <span
-                    class="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-black text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 md:inline-flex"
-                    x-text="herramientasAcademicasAbiertas ? 'Ocultar' : 'Mostrar'">
-                </span>
-
-                <span
-                    class="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition group-hover:border-sky-200 group-hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-300 dark:group-hover:border-sky-800 dark:group-hover:text-sky-300">
-                    <flux:icon.chevron-down class="h-5 w-5 transition-transform duration-300"
-                        x-bind:class="herramientasAcademicasAbiertas ? 'rotate-180' : ''" />
-                </span>
-            </div>
+            <span class="flex shrink-0 items-center gap-2 self-end rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition group-hover:border-sky-200 group-hover:text-sky-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 lg:self-auto">
+                <span x-text="herramientasAcademicasAbiertas ? 'Ocultar herramientas' : 'Ver herramientas'"></span>
+                <flux:icon.chevron-down class="h-4 w-4 transition-transform duration-300" x-bind:class="herramientasAcademicasAbiertas ? 'rotate-180' : ''" />
+            </span>
         </button>
 
         <div id="herramientas-academicas-{{ $slug_nivel }}" x-show="herramientasAcademicasAbiertas" x-collapse
@@ -759,43 +717,32 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                 class="border-t border-slate-200 bg-slate-50/50 p-4 dark:border-neutral-800 dark:bg-neutral-950/20 sm:p-5">
 
                 {{-- Importación de calificaciones por Excel --}}
-                <div
-                    class="overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-xl shadow-slate-200/50 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
-                    <div class="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600"></div>
-
+                <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <div class="h-1 w-full bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500"></div>
                     <div class="p-5 sm:p-6">
-                        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div>
-                                <div
-                                    class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40">
-                                    Importación Excel
+                        <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+                                    <flux:icon.cloud-arrow-up class="h-4 w-4" /> Excel · Importación masiva
                                 </div>
-
-                                <h3 class="mt-3 text-2xl font-black tracking-tight text-neutral-900 dark:text-white">
-                                    Plantilla profesional para importar calificaciones
-                                </h3>
-
-                                <p
-                                    class="mt-1 max-w-3xl text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-                                    Descarga la plantilla del grupo seleccionado, captura las calificaciones y vuelve a
-                                    subir el
-                                    archivo.
-                                    Solo edita las columnas de las materias. Las observaciones no se importan desde esta
-                                    plantilla.
-                                </p>
+                                <h3 class="mt-2 text-xl font-black tracking-tight text-neutral-900 dark:text-white sm:text-2xl">Actualiza las calificaciones desde Excel</h3>
+                                <p class="mt-2 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">Usa la plantilla del grupo seleccionado. Modifica únicamente las columnas de materias; las observaciones no se importan.</p>
                             </div>
-
                             <button type="button" wire:click="descargarPlantillaImportacion"
-                                wire:loading.attr="disabled" wire:target="descargarPlantillaImportacion"
+                                wire:loading.attr="disabled" wire:target="descargarPlantillaImportacion,archivo_calificaciones,importarPlantillaCalificaciones"
                                 @if (!$this->puedeUsarPlantillaImportacion) disabled @endif
-                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-sky-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
-                                <span wire:loading.remove wire:target="descargarPlantillaImportacion">
-                                    Descargar plantilla
-                                </span>
-                                <span wire:loading wire:target="descargarPlantillaImportacion">
-                                    Generando...
-                                </span>
+                                class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-emerald-600/15 transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                <flux:icon.arrow-down-tray class="h-4 w-4" />
+                                <span wire:loading.remove wire:target="descargarPlantillaImportacion">Descargar plantilla</span>
+                                <span wire:loading wire:target="descargarPlantillaImportacion">Preparando archivo...</span>
                             </button>
+                        </div>
+                        <div class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500 dark:border-neutral-800 dark:text-slate-400">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 dark:bg-neutral-800"><span class="font-black text-emerald-600">01</span> Descargar</span>
+                            <flux:icon.chevron-down class="h-3 w-3 -rotate-90 text-slate-400" />
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 dark:bg-neutral-800"><span class="font-black text-sky-600">02</span> Completar Excel</span>
+                            <flux:icon.chevron-down class="h-3 w-3 -rotate-90 text-slate-400" />
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 dark:bg-neutral-800"><span class="font-black text-indigo-600">03</span> Importar y verificar</span>
                         </div>
 
                         @if (!$this->puedeUsarPlantillaImportacion)
@@ -815,40 +762,37 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                             </div>
                         @endif
 
-                        <div class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-                            <div>
-                                <label class="mb-2 block text-sm font-bold text-neutral-700 dark:text-neutral-200">
-                                    Archivo Excel de calificaciones
-                                </label>
-
-                                <input type="file" wire:model="archivo_calificaciones" accept=".xlsx,.xls"
-                                    @if (!$this->puedeImportarPlantilla) disabled @endif
-                                    class="block w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm file:mr-4 file:rounded-xl file:border-0 file:bg-sky-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-sky-700 hover:file:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:file:bg-sky-950/40 dark:file:text-sky-300">
-
-                                <div wire:loading wire:target="archivo_calificaciones"
-                                    class="mt-2 text-xs font-semibold text-sky-600 dark:text-sky-300">
-                                    Cargando archivo...
-                                </div>
-
-                                @error('archivo_calificaciones')
-                                    <div
-                                        class="mt-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
-                                        {{ $message }}
+                        <div class="mt-5 rounded-2xl border border-dashed border-sky-200 bg-sky-50/40 p-4 dark:border-sky-900/40 dark:bg-sky-950/10 sm:p-5">
+                            <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
+                                <div class="min-w-0 flex-1">
+                                    <label for="archivo-importacion-calificaciones" class="mb-2 block text-sm font-extrabold text-slate-800 dark:text-slate-100">Selecciona tu archivo de calificaciones</label>
+                                    <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">Formato Excel (.xlsx o .xls), máximo 10 MB. Los cambios se aplicarán al pulsar «Importar calificaciones».</p>
+                                    <input id="archivo-importacion-calificaciones" type="file" wire:model="archivo_calificaciones" accept=".xlsx,.xls"
+                                        x-on:livewire-upload-start="subiendoPlantilla = true; porcentajePlantilla = 0"
+                                        x-on:livewire-upload-progress="porcentajePlantilla = $event.detail.progress"
+                                        x-on:livewire-upload-finish="subiendoPlantilla = false; porcentajePlantilla = 100"
+                                        x-on:livewire-upload-error="subiendoPlantilla = false; porcentajePlantilla = 0"
+                                        x-on:livewire-upload-cancel="subiendoPlantilla = false; porcentajePlantilla = 0"
+                                        wire:loading.attr="disabled" wire:target="importarPlantillaCalificaciones"
+                                        @if (!$this->puedeImportarPlantilla) disabled @endif
+                                        class="block w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm text-slate-700 shadow-sm file:mr-3 file:rounded-lg file:border-0 file:bg-sky-100 file:px-3 file:py-2 file:text-xs file:font-bold file:text-sky-800 hover:file:bg-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:file:bg-sky-950/40 dark:file:text-sky-200">
+                                    <div x-show="subiendoPlantilla" x-cloak class="mt-3" role="status" aria-live="polite">
+                                        <div class="mb-1 flex justify-between text-xs font-bold text-sky-700 dark:text-sky-300"><span>Subiendo archivo...</span><span x-text="porcentajePlantilla + '%'"></span></div>
+                                        <div class="h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-sky-950"><div class="h-full rounded-full bg-sky-500 transition-all duration-200" x-bind:style="'width: ' + porcentajePlantilla + '%'"></div></div>
                                     </div>
-                                @enderror
+                                    @error('archivo_calificaciones')
+                                        <p class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300" role="alert">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <button type="button" wire:click="importarPlantillaCalificaciones"
+                                    wire:loading.attr="disabled" wire:target="archivo_calificaciones,importarPlantillaCalificaciones"
+                                    @if (!$this->puedeImportarPlantilla) disabled @endif
+                                    class="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                    <flux:icon.cloud-arrow-up class="h-4 w-4" />
+                                    <span wire:loading.remove wire:target="importarPlantillaCalificaciones">Importar calificaciones</span>
+                                    <span wire:loading wire:target="importarPlantillaCalificaciones">Procesando...</span>
+                                </button>
                             </div>
-
-                            <button type="button" wire:click="importarPlantillaCalificaciones"
-                                wire:loading.attr="disabled" wire:target="importarPlantillaCalificaciones"
-                                @if (!$this->puedeImportarPlantilla) disabled @endif
-                                class="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
-                                <span wire:loading.remove wire:target="importarPlantillaCalificaciones">
-                                    Importar calificaciones
-                                </span>
-                                <span wire:loading wire:target="importarPlantillaCalificaciones">
-                                    Importando...
-                                </span>
-                            </button>
                         </div>
 
                         @if (!empty($resumenImportacion))
@@ -912,53 +856,30 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                 @php($estadisticas = $this->estadisticasCalificaciones)
 
                 @if (count($inscripciones) > 0 && count($materias) > 0)
-                    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
-                        <div
-                            class="rounded-2xl border border-sky-100 bg-sky-50 p-4 dark:border-sky-900/40 dark:bg-sky-950/30">
-                            <p class="text-xs font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                                Promedio global</p>
-                            <p class="mt-1 text-2xl font-black text-sky-900 dark:text-sky-100">
-                                {{ $estadisticas['promedio_global'] ?? '—' }}</p>
-                        </div>
-                        <div
-                            class="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/30">
-                            <p
-                                class="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                                Aprobación
-                            </p>
-                            <p class="mt-1 text-2xl font-black text-emerald-900 dark:text-emerald-100">
-                                {{ $estadisticas['porcentaje_aprobacion'] }}%</p>
-                        </div>
-                        <div
-                            class="rounded-2xl border border-amber-100 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/30">
-                            <p class="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                                Pendientes</p>
-                            <p class="mt-1 text-2xl font-black text-amber-900 dark:text-amber-100">
-                                {{ $estadisticas['pendientes'] }}</p>
-                        </div>
-                        <div
-                            class="rounded-2xl border border-rose-100 bg-rose-50 p-4 dark:border-rose-900/40 dark:bg-rose-950/30">
-                            <p class="text-xs font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300">
-                                Reprobadas</p>
-                            <p class="mt-1 text-2xl font-black text-rose-900 dark:text-rose-100">
-                                {{ $estadisticas['reprobadas'] }}
-                            </p>
-                        </div>
-                        <div
-                            class="rounded-2xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-900/40 dark:bg-violet-950/30">
-                            <p class="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">
-                                Especiales
-                            </p>
-                            <p class="mt-1 text-2xl font-black text-violet-900 dark:text-violet-100">
-                                {{ $estadisticas['especiales'] }}</p>
-                        </div>
-                        <div
-                            class="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/30">
-                            <p class="text-xs font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                                Captura</p>
-                            <p class="mt-1 text-2xl font-black text-indigo-900 dark:text-indigo-100">
-                                {{ $estadisticas['porcentaje_captura'] }}%</p>
-                        </div>
+                    <div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Indicadores académicos del grupo">
+                        @foreach ([
+                            ['nombre' => 'Promedio global', 'valor' => $estadisticas['promedio_global'] ?? '—', 'color' => 'sky', 'subtitulo' => 'Rendimiento'],
+                            ['nombre' => 'Aprobación', 'valor' => ($estadisticas['porcentaje_aprobacion'] ?? 0). '%', 'color' => 'emerald', 'subtitulo' => 'Aprobadas'],
+                            ['nombre' => 'Pendientes', 'valor' => $estadisticas['pendientes'] ?? 0, 'color' => 'amber', 'subtitulo' => 'Sin captura'],
+                            ['nombre' => 'Reprobadas', 'valor' => $estadisticas['reprobadas'] ?? 0, 'color' => 'rose', 'subtitulo' => 'Por atender'],
+                            ['nombre' => 'Especiales', 'valor' => $estadisticas['especiales'] ?? 0, 'color' => 'violet', 'subtitulo' => 'Valores especiales'],
+                            ['nombre' => 'Captura', 'valor' => ($estadisticas['porcentaje_captura'] ?? 0). '%', 'color' => 'indigo', 'subtitulo' => 'Avance registrado'],
+                        ] as $metrica)
+                            <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                                <span @class([
+                                    'absolute left-0 top-0 h-full w-1',
+                                    'bg-sky-500' => $metrica['color'] === 'sky',
+                                    'bg-emerald-500' => $metrica['color'] === 'emerald',
+                                    'bg-amber-500' => $metrica['color'] === 'amber',
+                                    'bg-rose-500' => $metrica['color'] === 'rose',
+                                    'bg-violet-500' => $metrica['color'] === 'violet',
+                                    'bg-indigo-500' => $metrica['color'] === 'indigo',
+                                ])></span>
+                                <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $metrica['nombre'] }}</p>
+                                <p class="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-white">{{ $metrica['valor'] }}</p>
+                                <p class="mt-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">{{ $metrica['subtitulo'] }}</p>
+                            </div>
+                        @endforeach
                     </div>
                 @endif
 
@@ -966,11 +887,11 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                 {{-- DIAGNÓSTICO ACADÉMICO INTELIGENTE --}}
                 @if ($this->diagnosticoCalificaciones['hay_datos'])
                     <div x-data="{ abiertoDiagnosticoAcademico: false }"
-                        class="mt-6 overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-xl shadow-slate-200/50 dark:border-neutral-700 dark:bg-neutral-900 dark:shadow-black/20">
-                        <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500"></div>
+                        class="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                        <div class="h-1 w-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400"></div>
 
                         <button type="button" x-on:click="abiertoDiagnosticoAcademico = !abiertoDiagnosticoAcademico"
-                            class="group flex w-full items-center justify-between gap-4 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-5 py-4 text-left transition hover:from-amber-100 hover:via-orange-100 hover:to-rose-100 dark:from-amber-950/20 dark:via-neutral-900 dark:to-rose-950/20 dark:hover:from-amber-950/30 dark:hover:to-rose-950/30">
+                            class="group flex w-full items-center justify-between gap-4 bg-amber-50/60 px-5 py-5 text-left transition hover:bg-amber-50 dark:bg-amber-950/10 dark:hover:bg-amber-950/20">
                             <div class="flex min-w-0 items-start gap-4">
                                 <div
                                     class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-white text-amber-700 shadow-sm dark:border-amber-900/40 dark:bg-neutral-950 dark:text-amber-300">
@@ -1413,8 +1334,8 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                 {{-- INFORME PEDAGÓGICO REDACTADO CON GROQCLOUD --}}
                 @if ($this->diagnosticoCalificaciones['hay_datos'])
                     <div x-data="{ copiado: false }"
-                        class="mt-6 overflow-hidden rounded-[28px] border border-violet-200 bg-white shadow-xl shadow-violet-100/60 dark:border-violet-900/40 dark:bg-neutral-900 dark:shadow-black/20">
-                        <div class="h-1.5 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-sky-500"></div>
+                        class="mt-5 overflow-hidden rounded-3xl border border-violet-200/70 bg-white shadow-sm dark:border-violet-900/40 dark:bg-neutral-900">
+                        <div class="h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-sky-500"></div>
 
                         <div class="p-5 sm:p-6">
                             <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -1461,7 +1382,7 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                                         <div class="flex items-end">
                                             <button type="button" wire:click="generarDiagnosticoIa"
                                                 wire:loading.attr="disabled" wire:target="generarDiagnosticoIa"
-                                                class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+                                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-extrabold text-white shadow-md shadow-violet-600/20 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
                                                 <span wire:loading.remove wire:target="generarDiagnosticoIa"
                                                     class="inline-flex items-center gap-2">
                                                     <flux:icon.sparkles class="h-4 w-4" />
@@ -1506,6 +1427,24 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                                         </div>
 
                                         <div class="flex flex-wrap gap-2">
+                                            <button type="button" wire:click="descargarInformeIaPdf"
+                                                wire:loading.attr="disabled"
+                                                wire:target="descargarInformeIaPdf,descargarInformeIaWord,generarDiagnosticoIa"
+                                                class="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-black text-sky-800 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-50 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-300">
+                                                <flux:icon.document-arrow-down class="h-4 w-4" />
+                                                <span wire:loading.remove wire:target="descargarInformeIaPdf">Descargar PDF</span>
+                                                <span wire:loading wire:target="descargarInformeIaPdf">Preparando PDF…</span>
+                                            </button>
+
+                                            <button type="button" wire:click="descargarInformeIaWord"
+                                                wire:loading.attr="disabled"
+                                                wire:target="descargarInformeIaPdf,descargarInformeIaWord,generarDiagnosticoIa"
+                                                class="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-800 transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-50 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300">
+                                                <flux:icon.document-text class="h-4 w-4" />
+                                                <span wire:loading.remove wire:target="descargarInformeIaWord">Descargar Word</span>
+                                                <span wire:loading wire:target="descargarInformeIaWord">Preparando Word…</span>
+                                            </button>
+
                                             <button type="button"
                                                 x-on:click="navigator.clipboard.writeText($refs.informeGroq.innerText).then(() => { copiado = true; setTimeout(() => copiado = false, 1800) })"
                                                 class="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-black text-neutral-700 transition hover:border-violet-200 hover:text-violet-700 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:border-violet-800 dark:hover:text-violet-300">
@@ -1637,28 +1576,32 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
     <div
         class="mt-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
         <div class="relative">
-            <div wire:loading.flex
-                wire:target="nivel_id,ciclo_escolar_id,generacion_id,grado_id,grupo_id,semestre_id,parcial_bachillerato_id,periodo_basica_id,busqueda,filtro_estado,filtro_registros,filtro_estatus_historico,orden_promedio,limpiarFiltros,guardarCalificaciones,abrirRevisionGuardado"
-                class="absolute inset-0 z-30 items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-neutral-950/60">
-                <div
-                    class="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-5 py-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-950">
-                    <div
-                        class="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white">
+            {{-- Los loaders son locales y no bloquean toda la matriz de calificaciones. --}}
+
+            <div class="border-b border-slate-200 bg-slate-50/50 p-4 dark:border-neutral-800 dark:bg-neutral-900/60 sm:p-5">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-100 bg-white text-sky-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-sky-300"><flux:icon.clipboard-document class="h-5 w-5" /></span>
+                        <div><h3 class="text-sm font-black text-slate-900 dark:text-white">Explorar calificaciones</h3><p class="text-xs text-slate-500 dark:text-slate-400">Busca, filtra y consulta el desempeño del grupo.</p></div>
                     </div>
-                    <div class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Cargando…</div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">{{ count($inscripcionesTabla) }} alumnos</span>
+                        <span class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">{{ count($materias) }} materias</span>
+                        <span wire:loading.delay.flex wire:target="importarPlantillaCalificaciones"
+                            class="items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-300"
+                            role="status" aria-live="polite" style="display: none">
+                            <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600 dark:border-indigo-900 dark:border-t-indigo-300" aria-hidden="true"></span>
+                            Importando calificaciones…
+                        </span>
+                    </div>
                 </div>
-            </div>
-
-            <div class="border-b border-neutral-200 p-4 dark:border-neutral-800">
-                <div class="grid grid-cols-1 items-end gap-4 md:grid-cols-2 xl:grid-cols-6">
+                <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-6">
                     <div class="xl:col-span-2">
-                        <label class="text-xs font-medium text-neutral-600 dark:text-neutral-300">
-                            Buscar alumno o matrícula en este contexto
-                        </label>
+                        <label for="calificaciones-busqueda" class="text-xs font-bold text-slate-700 dark:text-neutral-200">Buscar alumno o matrícula</label>
 
-                        <input type="text" wire:model.live.debounce.300ms="busqueda"
-                            placeholder="Escribe nombre o matrícula..."
-                            class="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-sky-300 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">
+                        <input id="calificaciones-busqueda" type="search" wire:model.live.debounce.300ms="busqueda"
+                            placeholder="Nombre o matrícula..."
+                            class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:ring-sky-950">
 
                         @if (!$esProfesor && filled($busqueda))
                             <a href="{{ route('misrutas.matricula.historial.pdf', [
@@ -1722,189 +1665,141 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                     </div>
                 </div>
                 @unless ($esProfesor)
-                <div
-                    class="mt-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-3 dark:border-sky-900/40 dark:bg-sky-950/20">
-                    <div class="flex items-start gap-3">
-                        <div
-                            class="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm dark:bg-neutral-900 dark:text-sky-300">
-                            <flux:icon.document-text class="h-5 w-5" />
-                        </div>
-
-                        <div class="min-w-0 flex-1">
-                            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-
-                                {{-- Boleta por alumno --}}
-                                <div
-                                    class="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                                    <div class="flex items-start gap-3">
-                                        <div
-                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300">
-                                            <flux:icon.document-arrow-down class="h-5 w-5" />
-                                        </div>
-
-                                        <div class="min-w-0 flex-1">
-                                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                                Descargar boleta
-                                            </h4>
-
-                                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                                Selecciona un alumno para descargar su boleta del
-                                                {{ $this->esBachillerato ? 'parcial' : 'periodo' }} seleccionado.
-                                            </p>
-
-                                            <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                                                <div class="flex-1">
-                                                    <flux:select
-                                                        label="{{ $this->esBachillerato ? 'Boleta parcial por alumno' : 'Boleta de periodo por alumno' }}"
-                                                        wire:model.live="boleta_inscripcion_id"
-                                                        :disabled="count($inscripciones) === 0 || !$periodo_id">
-
-                                                        <flux:select.option value="">
-                                                            -- Selecciona un alumno --
-                                                        </flux:select.option>
-
-                                                        @foreach ($inscripciones as $alumnoBoleta)
-                                                            <flux:select.option
-                                                                value="{{ $alumnoBoleta['inscripcion_id'] }}">
-                                                                {{ $alumnoBoleta['matricula'] }} -
-                                                                {{ $alumnoBoleta['alumno'] }}
-                                                            </flux:select.option>
-                                                        @endforeach
-                                                    </flux:select>
-                                                </div>
-
-                                                <button type="button"
-                                                    @if (!$this->puedeExportarBoleta) disabled @endif
-                                                    x-on:click="window.open('{{ route(
-                                                        'misrutas.boleta.calificaciones.pdf',
-                                                        array_filter([
-                                                            'slug_nivel' => $slug_nivel,
-                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                            'generacion_id' => $generacion_id,
-                                                            'grado_id' => $grado_id,
-                                                            'grupo_id' => $grupo_id,
-                                                            'periodo_id' => $periodo_id,
-                                                            'inscripcion_id' => $boleta_inscripcion_id,
-                                                            'semestre_id' => $this->esBachillerato ? $semestre_id : null,
-                                                            'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
-                                                            'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
-                                                        ]),
-                                                    ) }}', '_blank')"
-                                                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
-                                                    <flux:icon.document-arrow-down class="h-4 w-4" />
-                                                    Descargar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+                    {{-- Exportaciones masivas: no se usan selectores Livewire por alumno. --}}
+                    <section class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-950/40 sm:p-5"
+                        x-data="{
+                            descargando: '', errorDescarga: '',
+                            async descargarMasivo(event) {
+                                const enlace = event.currentTarget;
+                                if (this.descargando || enlace.getAttribute('aria-disabled') === 'true') return;
+                                this.descargando = enlace.dataset.documento;
+                                this.errorDescarga = '';
+                                try {
+                                    const respuesta = await fetch(enlace.href, {
+                                        method: 'GET', credentials: 'same-origin',
+                                        headers: { 'Accept': 'application/json' }
+                                    });
+                                    if (!respuesta.ok) {
+                                        const tipo = respuesta.headers.get('content-type') || '';
+                                        const mensaje = tipo.includes('application/json')
+                                            ? (await respuesta.json()).message
+                                            : '';
+                                        throw new Error(mensaje || 'No fue posible generar el archivo (HTTP ' + respuesta.status + ').');
+                                    }
+                                    const cabecera = respuesta.headers.get('content-disposition') || '';
+                                    const nombre = cabecera.match(/filename=[^;]+/i)?.[0]
+                                        ?.slice(9).replaceAll(String.fromCharCode(34), '').trim() || 'documentos-academicos';
+                                    const datos = await respuesta.blob();
+                                    const url = URL.createObjectURL(datos);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = nombre;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                } catch (error) {
+                                    this.errorDescarga = error?.message || 'No fue posible preparar el documento.';
+                                } finally {
+                                    this.descargando = '';
+                                }
+                            }
+                        }">
+                        <div class="flex flex-wrap items-start justify-between gap-3 p-4 sm:p-0 sm:pb-5">
+                            <div class="flex items-start gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300"><flux:icon.document-text class="h-5 w-5" /></span>
+                                <div>
+                                    <h4 class="text-sm font-black text-slate-900 dark:text-white">Exportación masiva de documentos</h4>
+                                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Un PDF o Word con todos los documentos del grupo y periodo elegidos, sin seleccionar alumnos uno por uno.</p>
                                 </div>
-
-                                {{-- Reconocimiento por alumno --}}
-                                <div
-                                    class="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/20 dark:via-neutral-900 dark:to-orange-950/20">
-                                    <div class="flex items-start gap-3">
-                                        <div
-                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm dark:bg-neutral-900 dark:text-amber-300">
-                                            <flux:icon.trophy class="h-5 w-5" />
-                                        </div>
-
-                                        <div class="min-w-0 flex-1">
-                                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                                Descargar reconocimiento
-                                            </h4>
-
-                                            <p class="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-                                                Selecciona un alumno para descargar su reconocimiento del
-                                                {{ $this->esBachillerato ? 'parcial' : 'periodo' }} seleccionado.
-                                            </p>
-
-                                            <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                                                <div class="flex-1">
-                                                    @php($alumnosReconocimientoOrdenados = $this->alumnosReconocimientoOrdenados)
-
-                                                    <flux:select
-                                                        label="{{ $this->esBachillerato ? 'Reconocimiento por parcial' : 'Reconocimiento por periodo' }}"
-                                                        wire:model.live="reconocimiento_inscripcion_id"
-                                                        :disabled="!$periodo_id || !$this->hayPromediosParaReconocimiento || count($alumnosReconocimientoOrdenados) === 0">
-
-                                                        @if (!$this->hayPromediosParaReconocimiento)
-                                                            <flux:select.option value="">
-                                                                -- No hay promedios para reconocimiento --
-                                                            </flux:select.option>
-                                                        @else
-                                                            <flux:select.option value="">
-                                                                -- Selecciona un alumno --
-                                                            </flux:select.option>
-
-                                                            @foreach ($alumnosReconocimientoOrdenados as $alumnoReconocimiento)
-                                                                <flux:select.option
-                                                                    value="{{ $alumnoReconocimiento['inscripcion_id'] }}">
-                                                                    {{ $alumnoReconocimiento['texto_lugar'] }} · Prom.
-                                                                    {{ $alumnoReconocimiento['promedio_texto'] }} ·
-                                                                    {{ $alumnoReconocimiento['matricula'] }} -
-                                                                    {{ $alumnoReconocimiento['alumno'] }}
-                                                                </flux:select.option>
-                                                            @endforeach
-                                                        @endif
-                                                    </flux:select>
-
-                                                    @if ($periodo_id && !$this->hayPromediosParaReconocimiento)
-                                                        <div
-                                                            class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                                                            No hay promedios disponibles para generar reconocimientos.
-                                                            Verifica que existan materias
-                                                            configuradas en materia_promediar y calificaciones
-                                                            capturadas.
-                                                        </div>
-                                                    @endif
-                                                </div>
-
-                                                <button type="button"
-                                                    @if (!$this->puedeExportarReconocimiento) disabled @endif
-                                                    x-on:click="window.open('{{ route(
-                                                        'misrutas.reconocimiento.calificaciones.pdf',
-                                                        array_filter([
-                                                            'slug_nivel' => $slug_nivel,
-                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
-                                                            'generacion_id' => $generacion_id,
-                                                            'grado_id' => $grado_id,
-                                                            'grupo_id' => $grupo_id,
-                                                            'periodo_id' => $periodo_id,
-                                                            'inscripcion_id' => $reconocimiento_inscripcion_id,
-                                                            'semestre_id' => $this->esBachillerato ? $semestre_id : null,
-                                                            'parcial_bachillerato_id' => $this->esBachillerato ? $parcial_bachillerato_id : null,
-                                                            'periodo_basica_id' => !$this->esBachillerato ? $periodo_basica_id : null,
-                                                        ]),
-                                                    ) }}', '_blank')"
-                                                    class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-500 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-amber-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">
-                                                    <flux:icon.trophy class="h-4 w-4" />
-                                                    Reconocimiento
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-
                             </div>
-
-                            @if (!$periodo_id)
-                                <div
-                                    class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                                    Primero selecciona {{ $this->esBachillerato ? 'un parcial' : 'un periodo' }}
-                                    para habilitar las descargas por alumno.
-                                </div>
-                            @endif
+                            <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">{{ count($inscripciones) }} alumnos en el contexto</span>
                         </div>
-                    </div>
-                </div>
+
+                        <div class="grid grid-cols-1 gap-4 px-4 pb-4 sm:px-0 sm:pb-0 xl:grid-cols-2">
+                            @foreach ([
+                                ['tipo' => 'boletas', 'nombre' => 'Boletas del grupo', 'descripcion' => 'Una boleta por alumno; conserva las materias, calificaciones y promedio del periodo.', 'clase' => 'sky'],
+                                ['tipo' => 'reconocimientos', 'nombre' => 'Reconocimientos por lugar', 'descripcion' => 'Solo 1.º, 2.º y 3.º lugar, incluyendo empates, según el cálculo oficial.', 'clase' => 'amber'],
+                            ] as $configuracion)
+                                <div class="relative rounded-2xl border p-4 sm:p-5 {{ $configuracion['tipo'] === 'boletas' ? 'border-sky-100 bg-sky-50/40 dark:border-sky-900/40 dark:bg-sky-950/15' : 'border-amber-100 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/15' }}">
+                                    <div class="flex items-start gap-3">
+                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-neutral-900 {{ $configuracion['tipo'] === 'boletas' ? 'text-sky-600' : 'text-amber-600' }}">
+                                            @if ($configuracion['tipo'] === 'boletas')
+                                                <flux:icon.document-arrow-down class="h-5 w-5" />
+                                            @else
+                                                <flux:icon.trophy class="h-5 w-5" />
+                                            @endif
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <h5 class="text-sm font-extrabold text-slate-900 dark:text-white">{{ $configuracion['nombre'] }}</h5>
+                                            <p class="mt-1 min-h-9 text-xs leading-relaxed text-slate-600 dark:text-neutral-400">{{ $configuracion['descripcion'] }}</p>
+                                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                                @foreach (['pdf' => 'PDF', 'word' => 'Word'] as $formato => $etiqueta)
+                                                    <a
+                                                        href="{{ route('misrutas.calificaciones.documentos.masivos', array_filter([
+                                                            'tipo' => $configuracion['tipo'],
+                                                            'formato' => $formato,
+                                                            'slug_nivel' => $slug_nivel,
+                                                            'ciclo_escolar_id' => $ciclo_escolar_id,
+                                                            'generacion_id' => $generacion_id,
+                                                            'grado_id' => $grado_id,
+                                                            'grupo_id' => $grupo_id,
+                                                            'periodo_id' => $periodo_id,
+                                                            'semestre_id' => $this->esBachillerato ? $semestre_id : null,
+                                                        ])) }}"
+                                                        data-documento="{{ $configuracion['tipo'] }}-{{ $formato }}"
+                                                        x-on:click.prevent="descargarMasivo($event)"
+                                                        x-bind:aria-disabled="descargando !== '' || {{ $this->puedeExportarPdf && count($inscripciones) > 0 ? 'false' : 'true' }}"
+                                                        x-bind:class="descargando !== '' ? 'pointer-events-none opacity-50' : ''"
+                                                        @if (!$this->puedeExportarPdf || count($inscripciones) === 0) aria-disabled="true" tabindex="-1" @endif
+                                                        class="inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 py-2 text-xs font-extrabold shadow-sm transition hover:-translate-y-px {{ $configuracion['tipo'] === 'boletas' ? 'border-sky-200 bg-white text-sky-700 hover:bg-sky-100 dark:border-sky-900 dark:bg-neutral-900 dark:text-sky-300' : 'border-amber-200 bg-white text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-neutral-900 dark:text-amber-300' }}">
+                                                        <span x-show="descargando !== '{{ $configuracion['tipo'] }}-{{ $formato }}'" class="inline-flex"><flux:icon.arrow-down-tray class="h-4 w-4" /></span>
+                                                        <span x-show="descargando === '{{ $configuracion['tipo'] }}-{{ $formato }}'" style="display: none" class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                                                        <span x-text="descargando === '{{ $configuracion['tipo'] }}-{{ $formato }}' ? 'Preparando…' : 'Descargar {{ $etiqueta }}'"></span>
+                                                    </a>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        <p x-show="descargando !== ''" style="display:none" role="status" aria-live="polite" class="mx-4 mt-3 text-xs font-semibold text-sky-700 dark:text-sky-300 sm:mx-0">Generando el archivo con los datos del periodo. La descarga comenzará al finalizar.</p>
+                        <p x-show="errorDescarga !== ''" x-text="errorDescarga" style="display:none" role="alert" class="mx-4 mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200 sm:mx-0"></p>
+                        @if (!$this->puedeExportarPdf)
+                            <p class="mx-4 mb-4 text-xs font-semibold text-amber-700 dark:text-amber-300 sm:mx-0">Selecciona ciclo, generación, grado, grupo y {{ $this->esBachillerato ? 'parcial' : 'periodo' }} para exportar.</p>
+                        @endif
+                    </section>
                 @endunless
 
 
 
             </div>
 
-            <div class="overflow-x-auto">
+            <div class="relative">
+                {{-- No se desmontan filas ni se interceptan clics: evita loaders permanentes o saltos de scroll. --}}
+                <div wire:loading.delay.short wire:target="{{ $objetivosTabla }}"
+                    style="display: none" aria-hidden="true"
+                    class="pointer-events-none absolute inset-x-0 top-0 z-30 h-1 overflow-hidden bg-sky-100 dark:bg-sky-950">
+                    <div class="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-emerald-400 via-sky-500 to-indigo-500"></div>
+                </div>
+                <div wire:loading.delay.short.flex wire:target="{{ $objetivosTabla }}"
+                    style="display: none" role="status" aria-live="polite"
+                    class="pointer-events-none absolute right-3 top-3 z-30 items-center gap-3 rounded-2xl border border-sky-200 bg-white/95 px-4 py-3 shadow-xl shadow-sky-900/10 backdrop-blur-sm dark:border-sky-900 dark:bg-neutral-900/95 sm:right-5">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-50 dark:bg-sky-950/40">
+                        <span class="h-5 w-5 animate-spin rounded-full border-[3px] border-sky-200 border-t-blue-600 dark:border-sky-900 dark:border-t-sky-300" aria-hidden="true"></span>
+                    </div>
+                    <div>
+                        <p class="text-xs font-black text-slate-900 dark:text-white">Actualizando calificaciones</p>
+                        <p class="mt-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">Sin perder tu posición en la tabla</p>
+                    </div>
+                    <div class="ml-1 flex items-end gap-1" aria-hidden="true">
+                        <span class="h-2 w-1 animate-pulse rounded-full bg-sky-300"></span>
+                        <span class="h-4 w-1 animate-pulse rounded-full bg-blue-400"></span>
+                        <span class="h-3 w-1 animate-pulse rounded-full bg-indigo-400"></span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead class="degradado sticky top-0 z-20 bg-neutral-50 dark:bg-neutral-950/60">
                         <tr class="text-neutral-600 dark:text-neutral-300">
@@ -2056,6 +1951,7 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                         @endforelse
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <div class="border-t border-neutral-200 p-5 dark:border-neutral-800">
@@ -2230,6 +2126,23 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                             Visualización automática de promedios por alumno, por materia y rendimiento global del
                             grupo.
                         </p>
+                        @if (($graficasCalificaciones['global']['total_numericas'] ?? 0) > 0)
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <button type="button" x-on:click="exportarImagen('todas', 'copiar')"
+                                    x-bind:disabled="Boolean(exportandoGrafica)"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-wait disabled:opacity-60">
+                                    <flux:icon.document-duplicate class="size-4" />
+                                    <span x-text="exportandoGrafica === 'todas' ? 'Preparando imagen…' : 'Copiar las 3 gráficas'"></span>
+                                </button>
+                                <button type="button" x-on:click="exportarImagen('todas', 'descargar')"
+                                    x-bind:disabled="Boolean(exportandoGrafica)"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
+                                    <flux:icon.arrow-down-tray class="size-4" />
+                                    PNG completo
+                                </button>
+                                <span class="text-[11px] text-slate-500 dark:text-neutral-400">Con nombres y valores completos, sin recortes.</span>
+                            </div>
+                        @endif
                     </div>
 
                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -2289,13 +2202,32 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                     <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-3">
                         <div
                             class="rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/40">
-                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                Promedio por alumno
-                            </h4>
-
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">
-                                Promedio individual de cada estudiante.
-                            </p>
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                        Promedio por alumno
+                                    </h4>
+                                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                        Promedio individual de cada estudiante.
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <button type="button" x-on:click="exportarImagen('alumnos', 'copiar')"
+                                        x-bind:disabled="Boolean(exportandoGrafica)"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300"
+                                        aria-label="Copiar imagen completa: Promedio por alumno">
+                                        <flux:icon.document-duplicate class="size-3.5" />
+                                        Copiar
+                                    </button>
+                                    <button type="button" x-on:click="exportarImagen('alumnos', 'descargar')"
+                                        x-bind:disabled="Boolean(exportandoGrafica)"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-neutral-600 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                                        aria-label="Descargar PNG completo: Promedio por alumno">
+                                        <flux:icon.arrow-down-tray class="size-3.5" />
+                                        PNG
+                                    </button>
+                                </div>
+                            </div>
 
                             <div wire:ignore>
                                 <div id="graficaCalificacionesAlumnos" class="min-h-[330px]"></div>
@@ -2304,13 +2236,32 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
 
                         <div
                             class="rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/40">
-                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                Promedio por materia
-                            </h4>
-
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">
-                                Comparativo del rendimiento por asignatura.
-                            </p>
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                        Promedio por materia
+                                    </h4>
+                                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                        Comparativo del rendimiento por asignatura.
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <button type="button" x-on:click="exportarImagen('materias', 'copiar')"
+                                        x-bind:disabled="Boolean(exportandoGrafica)"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300"
+                                        aria-label="Copiar imagen completa: Promedio por materia">
+                                        <flux:icon.document-duplicate class="size-3.5" />
+                                        Copiar
+                                    </button>
+                                    <button type="button" x-on:click="exportarImagen('materias', 'descargar')"
+                                        x-bind:disabled="Boolean(exportandoGrafica)"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-neutral-600 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                                        aria-label="Descargar PNG completo: Promedio por materia">
+                                        <flux:icon.arrow-down-tray class="size-3.5" />
+                                        PNG
+                                    </button>
+                                </div>
+                            </div>
 
                             <div wire:ignore>
                                 <div id="graficaCalificacionesMaterias" class="min-h-[330px]"></div>
@@ -2319,13 +2270,32 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
 
                         <div
                             class="rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/40">
-                            <h4 class="text-sm font-black text-neutral-900 dark:text-white">
-                                Rendimiento global
-                            </h4>
-
-                            <p class="text-xs text-neutral-500 dark:text-neutral-400">
-                                Promedio general del grupo seleccionado.
-                            </p>
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h4 class="text-sm font-black text-neutral-900 dark:text-white">
+                                        Rendimiento global
+                                    </h4>
+                                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                        Promedio general del grupo seleccionado.
+                                    </p>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <button type="button" x-on:click="exportarImagen('global', 'copiar')"
+                                        x-bind:disabled="Boolean(exportandoGrafica)"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-bold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300"
+                                        aria-label="Copiar imagen completa: Rendimiento global">
+                                        <flux:icon.document-duplicate class="size-3.5" />
+                                        Copiar
+                                    </button>
+                                    <button type="button" x-on:click="exportarImagen('global', 'descargar')"
+                                        x-bind:disabled="Boolean(exportandoGrafica)"
+                                        class="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-neutral-600 transition hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                                        aria-label="Descargar PNG completo: Rendimiento global">
+                                        <flux:icon.arrow-down-tray class="size-3.5" />
+                                        PNG
+                                    </button>
+                                </div>
+                            </div>
 
                             <div wire:ignore>
                                 <div id="graficaCalificacionesGlobal" class="min-h-[330px]"></div>
@@ -2345,6 +2315,21 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                     </div>
                 @endif
             </div>
+
+            {{-- La notificación no cambia la altura del documento ni la posición de la tabla. --}}
+            <div x-cloak x-show="notificacionExportacion" x-transition.opacity.duration.200ms
+                class="fixed bottom-6 right-6 z-[200] w-[min(25rem,calc(100vw-3rem))] rounded-2xl border bg-white px-4 py-3 shadow-xl dark:bg-neutral-900"
+                x-bind:class="avisoExportacionAlternativo ? 'border-amber-300 dark:border-amber-900' : 'border-emerald-300 dark:border-emerald-900'"
+                role="status" aria-live="polite">
+                <div class="flex items-start gap-3">
+                    <flux:icon.photo class="mt-0.5 size-5 shrink-0 text-sky-600" />
+                    <span class="flex-1 text-sm font-semibold text-slate-800 dark:text-neutral-100" x-text="notificacionExportacion"></span>
+                    <button type="button" class="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-neutral-800"
+                        x-on:click="notificacionExportacion = ''" aria-label="Cerrar aviso de exportación">
+                        <flux:icon.x-mark class="size-4" />
+                    </button>
+                </div>
+            </div>
         </div>
     @endif
 
@@ -2355,7 +2340,7 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
             @keydown.escape.window="$wire.cancelarCorreccionHistorica()" @click.self="$wire.cancelarCorreccionHistorica()">
             <div x-show="show" x-transition
                 class="relative w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl dark:bg-neutral-900">
-                <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500"></div>
+                <div class="h-1 w-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400"></div>
                 <div class="space-y-5 p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex items-start gap-4">
@@ -2651,6 +2636,7 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
 
 
         <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+        <script src="{{ asset('js/calificaciones-graficas-export.js') }}"></script>
     @endonce
 
     <script>
@@ -2662,6 +2648,36 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                 graficaMaterias: null,
                 graficaGlobal: null,
                 timer: null,
+                exportandoGrafica: null,
+                notificacionExportacion: '',
+                avisoExportacionAlternativo: false,
+                timerAvisoExportacion: null,
+
+                async exportarImagen(tipo, accion) {
+                    if (this.exportandoGrafica) return;
+                    this.exportandoGrafica = tipo;
+                    try {
+                        const exportador = window.MoctezumaGraficasExporter;
+                        if (!exportador || typeof exportador[accion] !== 'function') {
+                            throw new Error('No se pudo cargar el exportador de imágenes. Recarga la página.');
+                        }
+                        const resultado = await exportador[accion](this.datos, tipo);
+                        this.notificarExportacion(resultado.mensaje, Boolean(resultado.alternativa));
+                    } catch (error) {
+                        this.notificarExportacion(error?.message || 'No se pudo generar la imagen.', true);
+                    } finally {
+                        this.exportandoGrafica = null;
+                    }
+                },
+
+                notificarExportacion(mensaje, alternativo = false) {
+                    clearTimeout(this.timerAvisoExportacion);
+                    this.notificacionExportacion = mensaje;
+                    this.avisoExportacionAlternativo = alternativo;
+                    this.timerAvisoExportacion = setTimeout(() => {
+                        this.notificacionExportacion = '';
+                    }, 7500);
+                },
 
                 iniciar() {
                     this.programarCarga();
@@ -2856,7 +2872,10 @@ iniciarHerramientasAcademicas()" x-on:abrir-pdf-entrega.window="window.open($eve
                         yaxis: {
                             min: 0,
                             max: 10,
-                            tickAmount: 5
+                            tickAmount: 5,
+                            labels: {
+                                formatter: valor => Number(valor).toFixed(0)
+                            }
                         },
                         plotOptions: {
                             bar: {

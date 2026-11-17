@@ -576,6 +576,12 @@ Route::get('/calificaciones/word', [PDFController::class, 'calificaciones_pdf'])
 
 Route::get('/calificaciones/pdf', [PDFController::class, 'calificaciones_pdf'])->name('misrutas.calificaciones.pdf');
 
+Route::get('/calificaciones/documentos/masivos/{tipo}/{formato}', \App\Http\Controllers\DocumentosPeriodoMasivosController::class)
+    ->middleware('admin')
+    ->whereIn('tipo', ['boletas', 'reconocimientos'])
+    ->whereIn('formato', ['pdf', 'word'])
+    ->name('misrutas.calificaciones.documentos.masivos');
+
 Route::get('/calificaciones/boleta/word', [PDFController::class, 'boleta_calificaciones_pdf'])
     ->name('misrutas.boleta.calificaciones.word');
 

@@ -22,6 +22,7 @@ use App\Models\Periodos;
 use App\Models\PeriodosBasica;
 use App\Models\Semestre;
 use App\Services\GroqCalificacionService;
+use App\Services\InformeAcademicoIaExportService;
 use App\Services\CalificacionCorreccionService;
 use App\Services\CicloNivelGateService;
 use App\Services\HistorialCalificacionesGeneracionService;
@@ -43,6 +44,7 @@ use Livewire\Attributes\Locked;
 use Throwable;
 use Livewire\Component;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 trait ProveeAnaliticaCalificaciones
 {
@@ -445,6 +447,7 @@ trait ProveeAnaliticaCalificaciones
 
                 return [
                     'nombre' => $this->recortarTexto($fila['alumno'] ?? 'Alumno', 24),
+                    'nombre_completo' => $fila['alumno'] ?? 'Alumno',
                     'promedio' => (float) $promedio,
                 ];
             })
@@ -473,6 +476,7 @@ trait ProveeAnaliticaCalificaciones
 
                 return [
                     'materia' => $this->recortarTexto($materia['materia'] ?? 'Materia', 18),
+                    'materia_completa' => $materia['materia'] ?? 'Materia',
                     'promedio' => PromedioExcel::truncar($promedioMateria) ?? 0.0,
                 ];
             })
@@ -502,10 +506,12 @@ trait ProveeAnaliticaCalificaciones
         return [
             'alumnos' => [
                 'labels' => $alumnos->pluck('nombre')->toArray(),
+                'labels_completas' => $alumnos->pluck('nombre_completo')->toArray(),
                 'series' => $alumnos->pluck('promedio')->toArray(),
             ],
             'materias' => [
                 'labels' => $materias->pluck('materia')->toArray(),
+                'labels_completas' => $materias->pluck('materia_completa')->toArray(),
                 'series' => $materias->pluck('promedio')->toArray(),
             ],
             'global' => [
@@ -886,11 +892,18 @@ trait ProveeAnaliticaCalificaciones
         }
 
         try {
+            $estadisticas = $this->construirEstadisticasAnonimasParaIa();
             $this->diagnosticoIa = $groq->generarDiagnostico(
-                $this->construirEstadisticasAnonimasParaIa(),
+                $estadisticas,
                 $this->tipoDiagnosticoIa
             );
 
+            // Congelar el contexto y el tipo del informe realmente generado.
+            // Cambiar posteriormente el selector no altera el documento descargable.
+            $this->metadatosDiagnosticoIa = [
+                'contexto' => $estadisticas['contexto'],
+                'tipo' => $this->tipoDiagnosticoIa,
+            ];
             $this->diagnosticoIaGeneradoEn = Carbon::now()->format('d/m/Y H:i');
 
             $this->dispatch('swal', [
@@ -903,6 +916,7 @@ trait ProveeAnaliticaCalificaciones
 
             $this->diagnosticoIa = [];
             $this->diagnosticoIaGeneradoEn = null;
+            $this->metadatosDiagnosticoIa = [];
 
             $this->dispatch('swal', [
                 'title' => $exception->getMessage(),
@@ -916,6 +930,73 @@ trait ProveeAnaliticaCalificaciones
     {
         $this->diagnosticoIa = [];
         $this->diagnosticoIaGeneradoEn = null;
+        $this->metadatosDiagnosticoIa = [];
+    }
+
+    public function descargarInformeIaPdf(InformeAcademicoIaExportService $exportador): ?StreamedResponse
+    {
+        $datos = $this->datosInformeIaExportable();
+        try {
+            $archivo = $exportador->generarPdf($datos['informe'], $datos['contexto'], $datos['tipo'], $datos['fecha']);
+            $nombre = $exportador->nombreArchivo($datos['contexto'], $datos['fecha'], 'pdf');
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->dispatch('swal', [
+                'title' => 'No fue posible generar el PDF. Revisa el registro del sistema.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+            return null;
+        }
+
+        return response()->streamDownload(static function () use ($archivo): void {
+            echo $archivo;
+        }, $nombre, ['Content-Type' => 'application/pdf']);
+    }
+
+    public function descargarInformeIaWord(InformeAcademicoIaExportService $exportador): ?StreamedResponse
+    {
+        $datos = $this->datosInformeIaExportable();
+        try {
+            $archivo = $exportador->generarWord($datos['informe'], $datos['contexto'], $datos['tipo'], $datos['fecha']);
+            $nombre = $exportador->nombreArchivo($datos['contexto'], $datos['fecha'], 'docx');
+        } catch (Throwable $exception) {
+            report($exception);
+            $this->dispatch('swal', [
+                'title' => 'No fue posible generar el Word. Revisa los permisos de almacenamiento.',
+                'icon' => 'error',
+                'position' => 'top-end',
+            ]);
+            return null;
+        }
+
+        return response()->streamDownload(static function () use ($archivo): void {
+            echo $archivo;
+        }, $nombre, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ]);
+    }
+
+    /** @return array{informe: array, contexto: array, tipo: string, fecha: string} */
+    private function datosInformeIaExportable(): array
+    {
+        $this->assertAdministrativeAcademicToolAccess();
+
+        abort_if(
+            empty($this->diagnosticoIa)
+                || blank($this->diagnosticoIaGeneradoEn)
+                || empty($this->metadatosDiagnosticoIa['contexto'])
+                || blank($this->metadatosDiagnosticoIa['tipo'] ?? ''),
+            422,
+            'Genera el informe académico con IA antes de descargarlo.'
+        );
+
+        return [
+            'informe' => $this->diagnosticoIa,
+            'contexto' => $this->metadatosDiagnosticoIa['contexto'],
+            'tipo' => $this->metadatosDiagnosticoIa['tipo'],
+            'fecha' => $this->diagnosticoIaGeneradoEn,
+        ];
     }
 
     private function construirEstadisticasAnonimasParaIa(): array

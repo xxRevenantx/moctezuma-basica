@@ -872,6 +872,7 @@ trait GestionaContextoCalificaciones
             'resumenImportacion',
             'diagnosticoIa',
             'diagnosticoIaGeneradoEn',
+            'metadatosDiagnosticoIa',
             'mensajeContexto',
         ]);
 
@@ -1189,6 +1190,7 @@ trait GestionaContextoCalificaciones
             'resumenImportacion',
             'diagnosticoIa',
             'diagnosticoIaGeneradoEn',
+            'metadatosDiagnosticoIa',
             'boleta_inscripcion_id',
             'reconocimiento_inscripcion_id',
             'mensajeContexto',
@@ -1229,6 +1231,7 @@ trait GestionaContextoCalificaciones
             'resumenImportacion',
             'diagnosticoIa',
             'diagnosticoIaGeneradoEn',
+            'metadatosDiagnosticoIa',
             'mensajeContexto',
         ]);
 
