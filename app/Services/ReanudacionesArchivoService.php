@@ -3,13 +3,10 @@
 namespace App\Services;
 
 use App\Models\ReanudacionLaboral;
-use Carbon\Carbon;
+use App\Services\Documentos\ReanudacionWordExporter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PhpOffice\PhpWord\IOFactory;
-use PhpOffice\PhpWord\PhpWord;
-use PhpOffice\PhpWord\Shared\Converter;
 use RuntimeException;
 use ZipArchive;
 
@@ -79,108 +76,7 @@ class ReanudacionesArchivoService
     /** @param Collection<int,ReanudacionLaboral> $registros */
     public function crearWordMasivo(Collection $registros): string
     {
-        $ruta = storage_path('app/temp/reanudaciones-' . Str::uuid() . '.docx');
-        if (! is_dir(dirname($ruta))) {
-            mkdir(dirname($ruta), 0775, true);
-        }
-
-        $word = new PhpWord();
-        $word->setDefaultFontName('Arial');
-        $word->setDefaultFontSize(11);
-
-        $word->addTitleStyle(1, ['bold' => true, 'size' => 12], ['alignment' => 'center']);
-        $word->addParagraphStyle('derecha', ['alignment' => 'right', 'spaceAfter' => 120]);
-        $word->addParagraphStyle('justificado', ['alignment' => 'both', 'lineHeight' => 1.25, 'spaceAfter' => 180]);
-        $word->addParagraphStyle('centrado', ['alignment' => 'center', 'spaceAfter' => 120]);
-        $word->addParagraphStyle('ccp', ['alignment' => 'left', 'spaceBefore' => 180, 'spaceAfter' => 0]);
-
-        foreach ($registros->values() as $indice => $registro) {
-            $snapshot = $registro->snapshot ?: [];
-            $nivel = $registro->nivel_nombre ?: 'NIVEL EDUCATIVO';
-            $escuela = data_get($snapshot, 'escuela.nombre', 'CENTRO UNIVERSITARIO MOCTEZUMA');
-            $cct = data_get($snapshot, 'nivel.cct');
-            $cicloCitado = (string) data_get($snapshot, 'ciclo_citado.nombre', $registro->ciclo_nombre);
-            $membrete = $this->membreteDesdeRegistro($registro);
-            $margenSuperiorCm = $membrete
-                ? max(0.5, min(8.0, ((float) $membrete['margen_superior_mm']) / 10))
-                : 1.7;
-
-            $section = $word->addSection([
-                'paperSize' => 'Letter',
-                'marginTop' => Converter::cmToTwip($margenSuperiorCm),
-                'marginBottom' => Converter::cmToTwip(1.5),
-                'marginLeft' => Converter::cmToTwip(2.3),
-                'marginRight' => Converter::cmToTwip(2.3),
-            ]);
-
-            if ($membrete) {
-                $header = $section->addHeader();
-                $header->addWatermark($membrete['ruta_absoluta'], [
-                    'width' => 816,
-                    'height' => 1056,
-                    'marginTop' => 0,
-                    'marginLeft' => 0,
-                    'wrappingStyle' => 'behind',
-                ]);
-            } else {
-                $logo = public_path('logo.png');
-                if (is_file($logo)) {
-                    $section->addImage($logo, [
-                        'width' => 145,
-                        'alignment' => 'center',
-                        'wrappingStyle' => 'inline',
-                    ]);
-                }
-
-                $section->addText(Str::upper((string) $escuela), ['bold' => true, 'size' => 12], 'centrado');
-                $subtitulo = Str::upper($nivel) . ($cct ? ' · C.C.T. ' . $cct : '');
-                $section->addText($subtitulo, ['bold' => true, 'size' => 10], 'centrado');
-            }
-            $section->addText('ASUNTO: REANUDACIÓN DE LABORES', ['bold' => true, 'size' => 10], 'derecha');
-            $section->addText(
-                'CIUDAD ALTAMIRANO, GRO., A ' . Str::upper($this->fechaLarga($registro->fecha_documento)) . '.',
-                ['size' => 10],
-                'derecha'
-            );
-
-            $destinatario = trim((string) ($registro->destinatario_nombre ?: data_get($snapshot, 'autoridades.destinatario_nombre')));
-            $cargo = trim((string) ($registro->destinatario_cargo ?: data_get($snapshot, 'autoridades.destinatario_cargo')));
-            $section->addText(Str::upper($destinatario ?: 'AUTORIDAD EDUCATIVA'), ['bold' => true]);
-            $section->addText(Str::upper($cargo ?: 'PRESENTE'), ['bold' => true]);
-            $section->addText('P R E S E N T E', ['bold' => true]);
-            $section->addTextBreak(1);
-
-            $tipo = match ($registro->tipo_reanudacion) {
-                'receso' => 'el receso escolar',
-                'invierno' => 'las vacaciones de invierno',
-                'primavera' => 'el periodo vacacional de primavera',
-                default => 'el periodo correspondiente',
-            };
-
-            $texto = 'Por este conducto, me permito informar que con fecha arriba señalada me presenté a reanudar mis labores, después de haber disfrutado ' . $tipo
-                . ', correspondiente al ciclo escolar ' . $cicloCitado
-                . ', en el ' . Str::upper($nivel) . ' del ' . $escuela . '.';
-            $section->addText($texto, [], 'justificado');
-            $section->addText('Sin otro particular, reciba un cordial saludo.', [], 'justificado');
-            $section->addTextBreak(2);
-            $section->addText('A T E N T A M E N T E', ['bold' => true], 'centrado');
-            $section->addTextBreak(2);
-            $section->addText(Str::upper($registro->persona_nombre), ['bold' => true], 'centrado');
-            $section->addText(Str::upper(implode(' / ', $registro->cargos ?: [])), [], 'centrado');
-
-            if (filled($registro->copias)) {
-                foreach (preg_split('/\r\n|\r|\n/', (string) $registro->copias) ?: [] as $linea) {
-                    if (trim($linea) !== '') {
-                        $section->addText(trim($linea), ['size' => 8], 'ccp');
-                    }
-                }
-            }
-
-        }
-
-        IOFactory::createWriter($word, 'Word2007')->save($ruta);
-
-        return $ruta;
+        return app(ReanudacionWordExporter::class)->exportar($registros);
     }
 
     public function eliminar(ReanudacionLaboral $registro): void
@@ -206,29 +102,4 @@ class ReanudacionesArchivoService
         return 'reanudaciones-laborales/' . Str::slug($registro->ciclo_nombre ?: 'sin-ciclo') . '/' . $registro->lote_uuid;
     }
 
-    /** @return array{ruta_absoluta:string,margen_superior_mm:float}|null */
-    private function membreteDesdeRegistro(ReanudacionLaboral $registro): ?array
-    {
-        $snapshot = is_array($registro->snapshot) ? $registro->snapshot : [];
-        $membrete = data_get($snapshot, 'membrete');
-
-        if (! is_array($membrete)) {
-            return null;
-        }
-
-        $ruta = trim((string) ($membrete['archivo_path'] ?? ''));
-        if ($ruta === '' || ! Storage::disk('public')->exists($ruta)) {
-            return null;
-        }
-
-        return [
-            'ruta_absoluta' => Storage::disk('public')->path($ruta),
-            'margen_superior_mm' => (float) ($membrete['margen_superior_mm'] ?? 32),
-        ];
-    }
-
-    private function fechaLarga($fecha): string
-    {
-        return Carbon::parse($fecha)->locale('es')->isoFormat('D [de] MMMM [de] YYYY');
-    }
 }

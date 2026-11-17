@@ -346,8 +346,15 @@ class ReanudacionesService
                     'nombre' => $asignacion->persona?->nombre,
                     'apellido_paterno' => $asignacion->persona?->apellido_paterno,
                     'apellido_materno' => $asignacion->persona?->apellido_materno,
+                    'rfc' => $asignacion->persona?->rfc,
+                    'curp' => $asignacion->persona?->curp,
                 ],
                 'cargos' => $cargos->all(),
+                'empleo' => [
+                    'ingreso_seg' => $asignacion->ingreso_seg?->format('Y-m-d'),
+                    'ingreso_sep' => $asignacion->ingreso_sep?->format('Y-m-d'),
+                    'ingreso_ct' => $asignacion->ingreso_ct?->format('Y-m-d'),
+                ],
                 'roles_slugs' => $detalles->map(fn(PersonaNivelDetalle $d) => $d->personaRole?->rolePersona?->slug)->filter()->unique()->values()->all(),
                 'grados' => $detalles->pluck('grado.nombre')->filter()->unique()->values()->all(),
                 'grupos' => $detalles->map(fn(PersonaNivelDetalle $d) => $d->grupo?->asignacionGrupo?->nombre)->filter()->unique()->values()->all(),
@@ -698,16 +705,32 @@ class ReanudacionesService
     private function autoridades(?Nivel $nivel): array
     {
         $supervisor = $nivel?->supervisor;
+        $director = $nivel?->director;
         $delegado = Director::query()->where('identificador', 'delegado-servicios-educativos-tierra-caliente')->first();
+        $administracion = Director::query()->where('identificador', 'director-general-administracion')->first();
+        $magisterio = Director::query()->where('identificador', 'director-magisterio-estatal')->first();
         $destinatario = $supervisor ?: $delegado;
 
+        // Guardar las identidades y datos de las firmas en el snapshot del oficio
+        // para que el Word histórico no cambie si cambian los directivos.
         return [
             'destinatario_nombre' => $this->nombreDirector($destinatario),
             'destinatario_cargo' => Str::upper((string) ($destinatario?->cargo ?: 'AUTORIDAD EDUCATIVA')),
-            'director_nombre' => $this->nombreDirector($nivel?->director),
-            'director_cargo' => Str::upper((string) ($nivel?->director?->cargo ?: 'DIRECTOR(A)')),
+            'director_nombre' => $this->nombreDirector($director),
+            'director_cargo' => Str::upper((string) ($director?->cargo ?: 'DIRECTOR(A)')),
+            'director_rfc' => $director?->rfc,
+            'director_curp' => $director?->curp,
             'supervisor_nombre' => $this->nombreDirector($supervisor),
             'supervisor_cargo' => Str::upper((string) ($supervisor?->cargo ?: 'SUPERVISOR ESCOLAR')),
+            'supervisor_rfc' => $supervisor?->rfc,
+            'supervisor_curp' => $supervisor?->curp,
+            'supervisor_zona_escolar' => $supervisor?->zona_escolar,
+            'delegado_nombre' => $this->nombreDirector($delegado),
+            'delegado_cargo' => $delegado?->cargo,
+            'administracion_nombre' => $this->nombreDirector($administracion),
+            'administracion_cargo' => $administracion?->cargo,
+            'magisterio_nombre' => $this->nombreDirector($magisterio),
+            'magisterio_cargo' => $magisterio?->cargo,
         ];
     }
 
