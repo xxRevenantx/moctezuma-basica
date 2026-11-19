@@ -137,6 +137,28 @@ class HistorialCicloEscolarService
         );
     }
 
+    /**
+     * Refleja una corrección de matrícula únicamente en la ficha del ciclo
+     * actualmente cursado. No modifica snapshots, ciclos cerrados ni las
+     * asignaciones históricas, que son evidencias de los datos originales.
+     */
+    public function sincronizarMatriculaVigente(Inscripcion $alumno): void
+    {
+        if (! $alumno->ciclo_escolar_id || blank($alumno->matricula)) {
+            return;
+        }
+
+        InscripcionCiclo::query()
+            ->where('inscripcion_id', $alumno->id)
+            ->where('ciclo_escolar_id', $alumno->ciclo_escolar_id)
+            ->where('estado', InscripcionCiclo::ESTADO_EN_CURSO)
+            ->where(function ($query) use ($alumno): void {
+                $query->whereNull('matricula')
+                    ->orWhere('matricula', '!=', $alumno->matricula);
+            })
+            ->update(['matricula' => $alumno->matricula]);
+    }
+
     public function registrarCambioAsignacion(
         Inscripcion $alumno,
         array $antes,

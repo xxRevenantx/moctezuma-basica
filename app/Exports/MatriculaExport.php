@@ -27,7 +27,7 @@ class MatriculaExport implements FromCollection, WithHeadings, ShouldAutoSize, W
 
             $row = [
                 $indice + 1,
-                $contexto?->matricula ?: $alumno->matricula,
+                $alumno->matriculaParaContexto($contexto),
                 $alumno->folio,
                 $alumno->curp,
                 trim("{$alumno->apellido_paterno} {$alumno->apellido_materno} {$alumno->nombre}"),

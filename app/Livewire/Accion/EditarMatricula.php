@@ -20,6 +20,8 @@ use App\Services\CurpService;
 use App\Services\EdadEscolarService;
 use App\Services\ExpedienteDigitalService;
 use App\Services\GestionAcademicaService;
+use App\Services\HistorialCicloEscolarService;
+use App\Services\MatriculaAlumnoService;
 use App\Services\ImagenPersonalService;
 use App\Services\ObservacionInscripcionService;
 use Carbon\Carbon;
@@ -1318,6 +1320,8 @@ class EditarMatricula extends Component
         GestionAcademicaService $service,
         ImagenPersonalService $imagenes,
         ObservacionInscripcionService $observacionesService,
+        MatriculaAlumnoService $matriculas,
+        HistorialCicloEscolarService $historialCiclos,
     ) {
         $this->sanitizar();
         $this->observaciones = $observacionesService->sanitizar($this->observaciones);
@@ -1366,6 +1370,7 @@ class EditarMatricula extends Component
             || (int) ($alumno->semestre_id ?? 0) !== (int) ($data['semestre_id'] ?? 0);
 
         $cambioEstatus = ($alumno->estatus ?? 'activo') !== $data['estatus'];
+        $cambioMatricula = (string) $alumno->matricula !== (string) $data['matricula'];
 
         if (
             $cambioEstatus
@@ -1422,7 +1427,7 @@ class EditarMatricula extends Component
             return null;
         }
 
-        DB::transaction(function () use ($alumno, $service, $imagenes, $observacionesService, $data, $cambioAcademico, $cambioEstatus): void {
+        DB::transaction(function () use ($alumno, $service, $imagenes, $observacionesService, $matriculas, $historialCiclos, $data, $cambioAcademico, $cambioEstatus, $cambioMatricula): void {
             $fotoPath = $alumno->foto_path;
 
             if ($this->foto) {
@@ -1432,7 +1437,9 @@ class EditarMatricula extends Component
 
             $alumno->update([
                 'curp' => $data['curp'],
-                'matricula' => $data['matricula'],
+                // Si cambia también la asignación, el servicio académico debe
+                // recibir la matrícula anterior para registrar bien el cambio.
+                'matricula' => $cambioAcademico ? $alumno->matricula : $data['matricula'],
                 'folio' => $data['folio'] ?? null,
                 'nombre' => $data['nombre'],
                 'apellido_paterno' => $data['apellido_paterno'],
@@ -1485,6 +1492,26 @@ class EditarMatricula extends Component
                     auth()->id(),
                     $data['fecha_estatus']
                 );
+            }
+
+            if ($cambioMatricula) {
+                // La edición directa de inscripciones no pasa por el flujo de
+                // cambio de asignación cuando solo cambia la matrícula. Además,
+                // ese servicio ya recibe la matrícula nueva si hubo otros cambios.
+                // Sincronizar siempre aquí evita dejar una matrícula vigente vieja.
+                $alumnoActualizado = $alumno->fresh();
+                $tieneMatriculaVigente = $alumnoActualizado->matriculaVigente()->exists();
+                $requiereMatriculaVigente = ! $alumnoActualizado->trashed()
+                    && $alumnoActualizado->activo
+                    && in_array($alumnoActualizado->estatus, Inscripcion::ESTATUS_ACTIVOS, true);
+
+                // No reactivar matrículas cerradas por baja definitiva,
+                // traslado o egreso solo por corregir un dato personal.
+                if ($tieneMatriculaVigente || $requiereMatriculaVigente) {
+                    $matriculas->asegurarVigente($alumnoActualizado, 'correccion', auth()->id());
+                }
+
+                $historialCiclos->sincronizarMatriculaVigente($alumnoActualizado);
             }
         });
 

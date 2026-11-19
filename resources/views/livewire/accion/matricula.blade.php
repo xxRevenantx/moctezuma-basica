@@ -611,7 +611,7 @@
                             </td>
                             <td class="px-4 py-4">
                                 <p class="font-black text-slate-900 dark:text-white">
-                                    {{ $contexto?->matricula ?: $alumno->matricula ?: '—' }}
+                                    {{ $alumno->matriculaParaContexto($contexto) }}
                                 </p>
                                 <p class="mt-1 text-xs text-slate-500">{{ $alumno->curp ?: 'Sin CURP' }}</p>
                             </td>

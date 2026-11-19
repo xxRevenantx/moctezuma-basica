@@ -422,6 +422,22 @@ class Inscripcion extends Model
             ->latestOfMany();
     }
 
+    /**
+     * En el ciclo vigente se muestra la matrícula editable de la inscripción.
+     * Los ciclos cerrados conservan la matrícula que tuvieron en su momento.
+     */
+    public function matriculaParaContexto(?InscripcionCiclo $contexto): string
+    {
+        if (
+            $contexto?->estado === InscripcionCiclo::ESTADO_EN_CURSO
+            && (int) $contexto->ciclo_escolar_id === (int) $this->ciclo_escolar_id
+        ) {
+            return (string) ($this->matricula ?: $contexto->matricula ?: '—');
+        }
+
+        return (string) ($contexto?->matricula ?: $this->matricula ?: '—');
+    }
+
     public function constancias()
     {
         return $this->hasMany(\App\Models\Constancia::class, 'inscripcion_id');
